@@ -1,0 +1,33 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':trader-core')
+    implementation project(':trader-engine')
+    implementation project(':trader-api')
+    implementation project(':trader-storage')
+    implementation project(':trader-cli')
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+}
+
+application {
+    mainClass = 'dev.doughbay.server.ServerMain'
+}
+
+// Self-contained doughbay-server.jar: `java -jar doughbay-server.jar doughbay-server.json`
+tasks.register('fatJar', Jar) {
+    archiveBaseName = 'doughbay-server'
+    archiveClassifier = ''
+    archiveVersion = ''
+    manifest {
+        attributes 'Main-Class': 'dev.doughbay.server.ServerMain'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    dependsOn configurations.runtimeClasspath
+    from sourceSets.main.output
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+build.dependsOn fatJar

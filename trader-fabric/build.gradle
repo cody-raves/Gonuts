@@ -1,0 +1,60 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = "0.1.0+${project.minecraft_version}"
+group = 'dev.doughbay'
+
+base {
+    archivesName = 'doughbay'
+}
+
+dependencies {
+    // No `mappings` line: Minecraft 26.2 ships unobfuscated, so Loom does not
+    // remap it. Yarn ended at 1.21.11 and Mojang publishes no mappings for the
+    // calendar-versioned releases.
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    // The market engine is plain Java with no Minecraft dependency. Bundle it
+    // and its runtime deps into the mod jar (jar-in-jar) so the mod is a
+    // single drop-in file.
+    include(implementation(project(':trader-core')))
+    include(implementation(project(':trader-api')))
+    include(implementation(project(':trader-storage')))
+    include(implementation(project(':trader-paper')))
+    include(implementation(project(':trader-engine')))
+    include(implementation('com.fasterxml.jackson.core:jackson-databind:2.17.2'))
+    include(implementation('com.fasterxml.jackson.core:jackson-core:2.17.2'))
+    include(implementation('com.fasterxml.jackson.core:jackson-annotations:2.17.2'))
+    include(implementation('org.xerial:sqlite-jdbc:3.46.1.0'))
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraft_version', project.minecraft_version
+    inputs.property 'loader_version', project.loader_version
+    inputs.property 'loader_dependency', project.loader_dependency
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version,
+               'minecraft_version': project.minecraft_version,
+               'loader_version': project.loader_version,
+               'loader_dependency': project.loader_dependency
+    }
+}
+
+// Minecraft 26.2 runs on Java 25; the headless modules stay on 21.
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 25
+}
+
+java {
+    withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+// Policy/config tests are pure JVM tests. Keep them enabled so malformed
+// execution permissions and fee settings are exercised by every full build.

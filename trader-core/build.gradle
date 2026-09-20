@@ -1,0 +1,3 @@
+// Pure market engine: no Minecraft, no HTTP, no database dependencies.
+dependencies {
+}

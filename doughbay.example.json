@@ -1,0 +1,47 @@
+{
+  "baseUrl": "https://api.donutsmp.net",
+  "databasePath": "data/doughbay.db",
+
+  "targetRequestsPerMinute": 180,
+  "hardMaxRequestsPerMinute": 220,
+
+  "commodities": [
+    "minecraft:ender_pearl",
+    "minecraft:redstone",
+    "minecraft:obsidian",
+    "minecraft:diamond",
+    "minecraft:netherite_scrap",
+    "minecraft:gold_ingot",
+    "minecraft:iron_ingot",
+    "minecraft:emerald",
+    "minecraft:coal_block",
+    "minecraft:glowstone"
+  ],
+
+  "auctionFeesConfirmed": false,
+  "listingFeeFlat": 0,
+  "listingFeePercent": 0.0,
+  "saleTaxPercent": 0.0,
+
+  "continuousAutomationEnabled": false,
+  "continuousAutomationServers": [],
+  "continuousMaxPurchasePrice": 0,
+  "continuousMaxSessionSpend": 0,
+  "continuousMaxTradesPerSession": 1,
+  "continuousMinimumProfit": 5000,
+  "continuousMinimumRoiPercent": 12,
+  "continuousMinimumConfidencePercent": 80,
+  "continuousCooldownSeconds": 10,
+  "continuousReservedHotbarSlot": 8,
+  "_continuousReservedHotbarSlotNote": "Zero-based: 8 is the player-visible ninth hotbar slot.",
+  "continuousMaximumHoldMinutes": 120,
+
+  "minimumSamples": 20,
+  "minimumProfit": 5000,
+  "minimumRoiPercent": 12,
+  "maximumPositionPercent": 10,
+  "bankrollReservePercent": 25,
+  "maximumConcurrentPositions": 8,
+  "skipFallingMarkets": true,
+  "commoditiesOnly": true
+}

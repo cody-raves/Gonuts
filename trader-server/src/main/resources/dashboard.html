@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GoNuts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* The mod's GUI palette: dark navy panels, thin edges, gold titles, blue trend bars. */
+  :root {
+    --bg: #0a0b0f; --panel: #0e1016; --card: #14161d; --card2: #090a0e; --edge: #2a2e3a; --edge2: #3c4050;
+    --text: #e8e8ec; --secondary: #b3b3ba; --muted: #898a92; --gold: #ffd966; --good: #74e48b; --warn: #ff9c5a; --bad: #e86a6a;
+    --teal: #2fd8bd; --blue: #4d9bff; --row: #252a33;
+    --pixel: "Silkscreen", "JetBrains Mono", monospace; --mono: "JetBrains Mono", ui-monospace, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.4 var(--mono); }
+  .frame { max-width: 1440px; margin: 18px auto; background: var(--panel); border: 1px solid var(--edge); box-shadow: inset 0 0 0 1px #05060a, 0 0 0 1px #05060a; padding: 14px 18px 22px; }
+  .frame::before { content: ""; display: block; }
+  /* header, as the mod draws it */
+  .hdr { display: flex; align-items: flex-start; gap: 12px; }
+  .hdr img.logo { height: 34px; width: auto; image-rendering: pixelated; }
+  .hdr .mascot { width: 40px; height: 34px; background: url(/assets/mascot_idle.png) no-repeat 0 0 / 40px auto; animation: idle 4.5s steps(16) infinite; image-rendering: pixelated; }
+  .hdr .mascot.watch { background-image: url(/assets/mascot_watch.png); animation: idle 1.8s steps(16) infinite; }
+  @keyframes idle { to { background-position: 0 -550px; } }
+  .hdr .tag { color: var(--secondary); margin-top: 9px; }
+  .hdr .right { margin-left: auto; text-align: right; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .hdr .right b { color: var(--gold); font-weight: 500; }
+  .hdr .right .acct::before { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--gold); margin-right: 6px; }
+  .live { margin: 6px 0 10px; font-family: var(--pixel); font-size: 11px; letter-spacing: .5px; color: var(--good); }
+  .live.warn { color: var(--warn); }
+  /* tab buttons: Minecraft grey bevels, gold outline when active */
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid var(--edge); padding-bottom: 12px; }
+  .tab { font-family: var(--pixel); font-size: 11px; padding: 7px 14px; background: linear-gradient(#8a8a8a, #6f6f6f); color: #e8e8e8; text-shadow: 1px 1px 0 #333; border: 2px solid #1c1c1c; box-shadow: inset 2px 2px 0 #b5b5b5, inset -2px -2px 0 #4a4a4a; cursor: pointer; user-select: none; text-decoration: none; }
+  .tab:hover { background: linear-gradient(#9a9ad8, #7a7ab8); }
+  .tab.active { box-shadow: inset 2px 2px 0 #b5b5b5, inset -2px -2px 0 #4a4a4a, 0 0 0 2px var(--gold); }
+  .section { font-family: var(--pixel); font-size: 11px; color: var(--gold); letter-spacing: .5px; text-transform: uppercase; display: flex; gap: 12px; align-items: baseline; margin: 0 0 8px; }
+  .section .hint { color: var(--secondary); font-family: var(--mono); text-transform: none; letter-spacing: 0; font-size: 12px; }
+  .section .hint.r { margin-left: auto; color: var(--muted); }
+  .page { display: none; } .page.active { display: block; }
+  /* cards like the Stats tab */
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  @media (max-width: 900px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+  .kcard { background: var(--card); border: 1px solid var(--edge); padding: 8px 9px; height: 64px; }
+  canvas.wide { width: 100%; height: 240px; display: block; }
+  .kcard .l { color: var(--muted); font-size: 11px; font-family: var(--pixel); text-transform: uppercase; }
+  .kcard .v { font-size: 17px; font-weight: 700; margin: 3px 0 1px; }
+  .kcard .n { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel { background: var(--card); border: 1px solid var(--edge); padding: 9px 10px 8px; margin-bottom: 10px; }
+  .panel.dark { background: var(--card2); }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  @media (max-width: 1000px) { .split { grid-template-columns: 1fr; } }
+  /* tables like the Opportunities tab */
+  table { width: 100%; border-collapse: collapse; }
+  th { font-family: var(--pixel); font-size: 10px; color: var(--gold); text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--edge); text-transform: uppercase; letter-spacing: .4px; cursor: pointer; white-space: nowrap; }
+  th.sorted { text-decoration: underline; }
+  td { padding: 6px 8px; border-bottom: 1px solid #1a1d25; vertical-align: middle; white-space: nowrap; }
+  tr.row:hover td { background: var(--row); cursor: pointer; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.trend { width: 110px; }
+  .spark { width: 100px; height: 22px; display: block; image-rendering: pixelated; }
+  .item { display: flex; align-items: center; gap: 8px; }
+  .icon { width: 16px; height: 16px; display: inline-block; flex: none; image-rendering: pixelated; background: #2a2e3a; box-shadow: inset -2px -2px 0 rgba(0,0,0,.45), inset 2px 2px 0 rgba(255,255,255,.12); }
+  img.icon { background: none !important; box-shadow: none; object-fit: contain; }
+  .stack { color: var(--secondary); }
+  .good { color: var(--good); } .warn { color: var(--warn); } .bad { color: var(--bad); } .gold { color: var(--gold); } .muted { color: var(--muted); } .sec { color: var(--secondary); } .blue { color: var(--blue); }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  input, select { background: #000; color: var(--text); border: 2px solid #a0a0a0; box-shadow: inset 0 0 0 1px #000; padding: 5px 8px; font: inherit; }
+  input:focus { outline: none; border-color: var(--gold); }
+  .btn { font-family: var(--pixel); font-size: 10px; padding: 7px 12px; background: linear-gradient(#8a8a8a, #6f6f6f); color: #eee; text-shadow: 1px 1px 0 #333; border: 2px solid #1c1c1c; box-shadow: inset 2px 2px 0 #b5b5b5, inset -2px -2px 0 #4a4a4a; cursor: pointer; }
+  .btn:hover { background: linear-gradient(#9a9ad8, #7a7ab8); }
+  .foot { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .bar { height: 5px; background: #1c1e26; border: 1px solid #3c4050; min-width: 80px; }
+  .bar i { display: block; height: 100%; background: var(--good); }
+  .bar.warn i { background: var(--warn); }
+  .grid45 { display: grid; grid-template-columns: repeat(15, 12px); gap: 3px; }
+  .grid45 i { width: 12px; height: 12px; background: #1c1e26; border: 1px solid #3c4050; }
+  .grid45 i.on { background: #5fcf78; border-color: #2e7a40; }
+  pre { background: var(--card2); border: 1px solid var(--edge); padding: 10px 12px; overflow: auto; font-size: 12px; }
+  .chartbox { position: relative; height: 320px; }
+  /* hover card */
+  #hover { position: fixed; z-index: 50; width: 360px; max-height: 420px; overflow: auto; background: #0b0c10; border: 1px solid var(--edge2); padding: 9px 11px; box-shadow: 0 10px 30px rgba(0,0,0,.6); pointer-events: none; display: none; font-size: 12px; }
+  #hover h3 { margin: 0 0 6px; font: 11px var(--pixel); color: var(--gold); display: flex; justify-content: space-between; text-transform: uppercase; }
+  #hover h3 span { color: var(--muted); font-family: var(--mono); text-transform: none; }
+  #hover .v { padding: 6px 0; border-top: 1px solid var(--edge); }
+  #hover .v .price { float: right; color: var(--gold); }
+  #hover .v .age { color: var(--muted); }
+  #hover .part { display: inline-block; margin: 3px 4px 0 0; padding: 1px 6px; background: #1c2130; color: var(--teal); border: 1px solid #263044; }
+  #hover .part.effect { color: #ff7fb0; } #hover .part.trim { color: #f2dfb7; } #hover .part.inner { color: var(--text); background: #14161d; }
+  #hover .none { color: var(--muted); }
+  .share { position: relative; display: block; height: 10px; background: #1c1e26; min-width: 70px; }
+  .share i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); }
+  .tiers { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 0 0 12px; }
+  .ihead { display: flex; align-items: center; gap: 14px; margin: 4px 0 10px; padding: 10px 12px; background: var(--card); border: 1px solid var(--edge); }
+  .ihead img.big { width: 48px; height: 48px; image-rendering: pixelated; background: var(--card2); border: 1px solid var(--edge); padding: 4px; }
+  .ihead .nm { font-family: var(--pixel); font-size: 14px; color: var(--text); }
+  .ihead .val { font-size: 22px; color: var(--gold); text-align: right; }
+  .ihead .chg { font-size: 12px; text-align: right; }
+  .tags .part { display: inline-block; margin: 0 4px 2px 0; padding: 0 4px; border: 1px solid var(--edge2); font-size: 11px; color: var(--secondary); }
+  .tags .part.effect { color: #c58cff; } .tags .part.trim { color: #7fd6ff; } .tags .part.inner { color: var(--secondary); }
+  .seen .v { padding: 4px 0; border-bottom: 1px solid var(--edge); } .seen .price { float: right; color: var(--gold); }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="hdr">
+    <img class="logo" src="/assets/logo.png" alt="GoNuts">
+    <div class="mascot" id="mascot"></div>
+    <div class="tag">auction analysis + verified execution</div>
+    <div class="right"><div id="updated">updated never</div><div class="acct" id="acct">no key</div></div>
+  </div>
+  <div class="live" id="live">CONNECTING TO THE DATA SERVER</div>
+  <div class="tabs">
+    <a class="tab active" data-page="overview" href="#overview">Overview</a>
+    <a class="tab" data-page="live" href="#live">Live</a>
+    <a class="tab" data-page="opportunities" href="#opportunities">Opportunities</a>
+    <a class="tab" data-page="markets" href="#markets">Markets</a>
+    <a class="tab" data-page="item" href="#item">Item</a>
+    <a class="tab" data-page="sellers" href="#sellers">Rivals</a>
+    <a class="tab" data-page="api" href="#api">API</a>
+  </div>
+
+  <section class="page active" id="page-overview">
+    <div class="section">Stats <span class="hint">· the whole auction house, last 24 h</span><span class="hint r" id="stamp"></span></div>
+    <div class="cards" id="cards"></div>
+    <div class="section">Ticket size <span class="hint">· where the last 24 h of revenue sits, by sale price</span></div>
+    <div class="tiers" id="tiers"></div>
+    <div class="split">
+      <div class="panel"><div class="section">Where the money is <span class="hint">· markets by revenue, 24 h</span></div><table id="byRevenue"><thead><tr><th>Item</th><th>Share</th><th class="num">Sales</th><th class="num">Avg ticket</th><th class="num">Revenue</th></tr></thead><tbody></tbody></table></div>
+      <div class="panel dark"><div class="section">Sales per hour <span class="hint r">completed sales seen by the feed</span></div><canvas id="hourly" class="wide"></canvas></div>
+    </div>
+    <div class="split">
+      <div class="panel"><div class="section">Edge <span class="hint">· quick-to-patient spread × sales per hour</span></div><table id="edge"><thead><tr><th>Item</th><th class="num">Quick</th><th class="num">Patient</th><th class="num">Spread</th><th class="num">Sales/h</th><th class="num">Profit/h</th><th class="num">Conf</th></tr></thead><tbody></tbody></table></div>
+      <div class="panel"><div class="section">Biggest sales <span class="hint">· 24 h, with what was on the listing</span></div><table id="biggest"><thead><tr><th>When</th><th>Item</th><th>Seller</th><th class="num">Price</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="split">
+      <div class="panel"><div class="section">Busiest markets <span class="hint">· by sales</span></div><table id="hottest"><thead><tr><th>Item</th><th>12h trend</th><th class="num">Sales</th><th class="num">Revenue</th></tr></thead><tbody></tbody></table></div>
+      <div class="panel"><div class="section">Movers <span class="hint">· median price trend, tracked markets</span></div><table id="movers"><thead><tr><th>Item</th><th>12h trend</th><th class="num">Median</th><th class="num">Trend</th><th class="num">Sales/h</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-live">
+    <div class="section">Live listings <span class="hint">· newest first, straight from the feed, refreshed every 5 s</span><span class="hint r" id="liveStamp"></span></div>
+    <div class="toolbar"><label class="sec"><input type="checkbox" id="dealsOnly"> deals only (under the quick-sale price)</label><input id="liveFilter" placeholder="filter…" style="width:220px"></div>
+    <div class="panel"><table id="liveTable"><thead><tr><th>When</th><th>Item</th><th>Seller</th><th class="num">Price</th><th class="num">Unit</th><th class="num">Quick sale</th><th class="num">Discount</th><th class="num">Sales/h</th></tr></thead><tbody></tbody></table>
+    <div class="foot">Green rows are priced under the market's quick-sale price · click a row for the item</div></div>
+  </section>
+
+  <section class="page" id="page-opportunities">
+    <div class="section">Opportunities <span class="hint">· buy at or under the ceiling, relist at target</span><span class="hint r" id="oppCount"></span></div>
+    <div class="toolbar"><span class="sec">max buy $</span><input id="cap" value="200000" style="width:120px"><button class="btn" id="reloadOpps">Refresh</button></div>
+    <div class="panel"><table id="oppTable"><thead><tr><th>Item</th><th>12h trend</th><th class="num">Buy</th><th class="num">Sell</th><th class="num">Profit</th><th class="num">ROI</th><th class="num">Hold</th><th class="num">Conf</th></tr></thead><tbody></tbody></table>
+    <div class="foot">Click a row for detail · hover for enchantments and contents</div></div>
+  </section>
+
+  <section class="page" id="page-markets">
+    <div class="section">Markets <span class="hint">· every tracked market with completed-sale statistics</span><span class="hint r" id="marketCount"></span></div>
+    <div class="toolbar"><input id="filter" placeholder="filter…" style="width:280px"></div>
+    <div class="panel"><table id="marketTable"><thead><tr>
+      <th data-k="itemKey">Item</th><th class="num" data-k="weightedMedian">Median</th><th class="num" data-k="quickSalePrice">Quick</th><th class="num" data-k="patientSalePrice">Patient</th><th class="num" data-k="salesPerHour">Sales/h</th><th class="num" data-k="trend">Trend</th><th class="num" data-k="confidence">Conf</th><th class="num" data-k="sampleCount">Samples</th>
+    </tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="page" id="page-item">
+    <div class="section" id="itemTitle">Item</div>
+    <div class="toolbar"><input id="item" placeholder="item id, e.g. minecraft:redstone" style="width:280px"><select id="window"><option value="6">6 h</option><option value="24" selected>24 h</option><option value="72">3 days</option><option value="168">7 days</option></select><button class="btn" id="lookup">Load</button></div>
+    <div class="ihead" id="ihead" hidden></div>
+    <div class="cards" id="itemCards"></div>
+    <div class="split">
+      <div class="panel dark"><div class="section">Live listing price <span class="hint">· lowest ask seen, 5-minute steps</span></div><div class="chartbox"><canvas id="askChart"></canvas></div></div>
+      <div class="panel"><div class="section">Price ranges <span class="hint">· unit price of completed sales</span></div><table id="ranges"><thead><tr><th>Window</th><th class="num">Sales</th><th class="num">Low</th><th class="num">Median</th><th class="num">High</th></tr></thead><tbody></tbody></table>
+        <div class="section" style="margin-top:14px">Seen on the page <span class="hint">· enchantments, effects, contents</span></div><div id="itemSeen" class="seen tags"></div></div>
+    </div>
+    <div class="panel dark"><div class="section">Auction price <span class="hint">· unit price of every sale, hourly median in gold</span></div><div class="chartbox"><canvas id="itemChart"></canvas></div></div>
+    <div class="panel"><div class="section">Recent transactions</div><table id="itemSales"><thead><tr><th>When</th><th>Seller</th><th>On the listing</th><th class="num">Count</th><th class="num">Total</th><th class="num">Unit</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="page" id="page-sellers">
+    <div class="section">Rivals <span class="hint">· sellers of the last 24 h, click a name for their sales</span></div>
+    <div class="panel dark"><table id="sellerTable"><thead><tr><th>Name</th><th class="num">Sales</th><th class="num">Revenue</th><th class="num">Items</th><th class="num">Hours</th><th>Bot</th></tr></thead><tbody></tbody></table></div>
+    <div class="panel" id="sellerDetail" hidden><div class="section" id="sellerName"></div><table id="sellerSales"><thead><tr><th>When</th><th>Item</th><th class="num">Count</th><th class="num">Total</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="page" id="page-api">
+    <div class="section">API <span class="hint">· send your key as X-Api-Key or ?key= · 120 requests a minute</span></div>
+    <div class="toolbar"><span class="sec">key</span><input id="key" placeholder="API key" style="width:360px"><button class="btn" id="save">Use</button></div>
+    <div class="panel"><table><thead><tr><th>Endpoint</th><th>Returns</th></tr></thead><tbody>
+      <tr><td>GET /v1/health</td><td class="sec">liveness, feed status, Donut budget use (no key)</td></tr>
+      <tr><td>GET /v1/overview</td><td class="sec">totals, revenue by market and ticket size, edge, biggest sales, movers</td></tr>
+      <tr><td>GET /v1/listings?since=&amp;limit=</td><td class="sec">newest listings from the live lane, with quick-sale price and discount beside each</td></tr>
+      <tr><td>GET /v1/markets</td><td class="sec">statistics for every tracked market</td></tr>
+      <tr><td>GET /v1/market/{itemKey}?since=&amp;limit=</td><td class="sec">one item: value, 24 h change, price ranges, lowest asks, sales with what was on the listing</td></tr>
+      <tr><td>GET /v1/trends?items=a,b</td><td class="sec">12 hourly buckets of count and median per item</td></tr>
+      <tr><td>GET /v1/components/{itemId}</td><td class="sec">observed enchantments, effects, trims, contents with asking prices</td></tr>
+      <tr><td>GET /v1/sales?since=&amp;limit=</td><td class="sec">completed sales since a timestamp, up to 5000</td></tr>
+      <tr><td>GET /v1/seller/{name}?since=</td><td class="sec">one seller's sales</td></tr>
+      <tr><td>GET /v1/rivals</td><td class="sec">sellers of the last 24 hours with the bot score</td></tr>
+      <tr><td>GET /v1/opportunities?cap=</td><td class="sec">buy signals from the current statistics</td></tr>
+    </tbody></table></div>
+    <div class="panel"><div class="section">Example</div><pre id="example"></pre></div>
+  </section>
+</div>
+<div id="hover"></div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let key = "";
+  try { key = localStorage.getItem("doughbay.key") || ""; } catch (e) {}
+  $("key").value = key;
+  const money = (v) => v >= 1e9 ? "$" + (v / 1e9).toFixed(2) + "b" : v >= 1e6 ? "$" + (v / 1e6).toFixed(2) + "m" : v >= 1e3 ? "$" + (v / 1e3).toFixed(1) + "k" : "$" + Math.round(v);
+  const num = (v) => Math.round(v).toLocaleString();
+  const pct = (v) => (v * 100).toFixed(0) + "%";
+  const base = (k) => (k || "").replace(/#.*/, "");
+  const name = (k) => base(k).replace("minecraft:", "").replace(/_/g, " ");
+  const title = (s) => name(s).replace(/\b\w/g, c => c.toUpperCase());
+  const when = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const hue = (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  const stackOf = (k, count) => count ? `<span class="stack">x${count}</span>` : "";
+  const bucketCount = (b) => ({ X1: 1, X16: 16, X32: 32, X64: 64, SINGLE: 1, SIXTEEN: 16, THIRTY_TWO: 32, SIXTY_FOUR: 64 })[b] || "";
+  // Real item textures from the client jar; a coloured square if one is missing.
+  const iconFor = (k) => { const id = base(k).replace("minecraft:", ""); return `<img class="icon" src="/assets/items/${id}.png" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'), {className: 'icon'}))" style="background:hsl(${hue(id)} 40% 45%)">`; };
+  const itemCell = (k, count) => `<span class="item">${iconFor(k)}<span>${title(k)} ${stackOf(k, count)}</span></span>`;
+  const api = async (path) => {
+    const r = await fetch(path, { headers: key ? { "X-Api-Key": key } : {} });
+    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).error || m; } catch (e) {} throw new Error(m); }
+    return r.json();
+  };
+
+  // small blue trend bars, drawn the way the mod draws them
+  const trendCache = new Map();
+  async function trendsFor(keys) {
+    const need = [...new Set(keys.map(base))].filter(k => !trendCache.has(k));
+    if (need.length && key) {
+      try { const t = await api("/v1/trends?items=" + encodeURIComponent(need.join(","))); for (const k of need) trendCache.set(k, t[k] || null); } catch (e) { need.forEach(k => trendCache.set(k, null)); }
+    }
+  }
+  function drawSpark(canvas, t) {
+    const w = canvas.width = 100, h = canvas.height = 22; const g = canvas.getContext("2d");
+    g.clearRect(0, 0, w, h); g.fillStyle = "#1c1e26"; g.fillRect(0, h - 1, w, 1);
+    if (!t) return;
+    const counts = t.counts, max = Math.max(1, ...counts), bw = Math.floor(w / 12);
+    counts.forEach((c, i) => { const bh = c ? Math.max(2, Math.round((h - 3) * c / max)) : 1; g.fillStyle = c ? "#4d9bff" : "#2a2e3a"; g.fillRect(i * bw + 1, h - 1 - bh, bw - 2, bh); });
+  }
+  async function paintSparks(scope) {
+    const els = [...scope.querySelectorAll("canvas.spark[data-item]")];
+    await trendsFor(els.map(c => c.dataset.item));
+    els.forEach(c => drawSpark(c, trendCache.get(base(c.dataset.item))));
+  }
+
+  const pages = [...document.querySelectorAll(".page")], tabs = [...document.querySelectorAll(".tab")];
+  const current = () => (location.hash || "#overview").slice(1);
+  function show(page) {
+    pages.forEach(p => p.classList.toggle("active", p.id === "page-" + page));
+    tabs.forEach(t => t.classList.toggle("active", t.dataset.page === page));
+    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    if (page === "live") liveTimer = setInterval(loadLive, 5000);
+    ({ overview: loadOverview, live: loadLive, opportunities: loadOpps, markets: loadMarkets, sellers: loadSellers, api: () => { $("example").textContent = `curl -H "X-Api-Key: ${key || "<your key>"}" ${location.origin}/v1/market/minecraft:redstone?since=${Date.now() - 86400e3}`; } })[page]?.();
+  }
+  tabs.forEach(t => t.onclick = (e) => { e.preventDefault(); location.hash = t.dataset.page; show(t.dataset.page); });
+  $("save").onclick = () => { key = $("key").value.trim(); try { localStorage.setItem("doughbay.key", key); } catch (e) {} health(); show(current()); };
+
+  async function health() {
+    try {
+      const h = await api("/v1/health");
+      const polling = h.lastSalesPollSecondsAgo != null;
+      $("live").className = "live" + (h.lastError ? " warn" : "");
+      $("live").textContent = (polling ? "LIVE MARKET DATA — OK · " : "SERVING STORED DATA — ") + h.markets + " markets" + (polling ? " · sales poll " + h.lastSalesPollSecondsAgo + "s ago · " + (h.donutRequestsLastMinute ?? 0) + "/" + (h.donutBudgetPerMinute ?? "?") + " requests this minute" : "") + (h.lastError ? " · " + h.lastError : "");
+      $("updated").textContent = "up " + Math.round(h.uptimeSeconds / 60) + " min";
+      $("acct").textContent = key ? "key " + key.slice(0, 8) + "…" : "no key";
+      $("mascot").classList.toggle("watch", polling);
+    } catch (e) { $("live").className = "live warn"; $("live").textContent = "DATA SERVER UNREACHABLE"; }
+  }
+
+  let lastOverview = null;
+  function card(l, v, n, cls) { return `<div class="kcard"><div class="l">${l}</div><div class="v ${cls || ""}">${v}</div><div class="n">${n}</div></div>`; }
+  function drawHourly(o) {
+    const c = $("hourly"); const w = c.width = c.clientWidth || 600, h = c.height = c.clientHeight || 240; const g = c.getContext("2d");
+    lastOverview = o;
+    g.clearRect(0, 0, w, h);
+    const max = Math.max(1, ...o.countByHour), rmax = Math.max(1, ...o.revenueByHour), n = 24, bw = Math.floor((w - 40) / n), left = 36;
+    g.fillStyle = "#2a2e3a"; g.fillRect(left, h - 18, w - left, 1);
+    o.countByHour.forEach((v, i) => { const bh = Math.round((h - 34) * v / max); g.fillStyle = "#4d9bff"; g.fillRect(left + i * bw + 1, h - 18 - bh, bw - 2, bh); });
+    g.strokeStyle = "#ffd966"; g.lineWidth = 2; g.beginPath();
+    o.revenueByHour.forEach((v, i) => { const x = left + i * bw + bw / 2, y = h - 18 - Math.round((h - 34) * v / rmax); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+    g.fillStyle = "#898a92"; g.font = "10px JetBrains Mono, monospace";
+    g.fillText(num(max), 2, 12); g.fillText("0", 2, h - 20);
+    for (let i = 0; i < n; i += 4) g.fillText(when(o.since + i * 3600e3), left + i * bw, h - 5);
+    g.fillStyle = "#ffd966"; g.fillText("revenue " + money(rmax) + " peak", w - 150, 12);
+  }
+  async function loadOverview() {
+    if (!key) { $("cards").innerHTML = card("API key", "—", "enter your key on the API tab"); return; }
+    try {
+      const o = await api("/v1/overview");
+      $("stamp").textContent = "feed window from " + when(o.since);
+      $("cards").innerHTML = card("Sales, last hour", num(o.lastHourSales), "completed sales seen") + card("Revenue, last hour", money(o.lastHourRevenue), "sum of sale prices", "good") + card("Active sellers", num(o.sellersLastHour), "sold in the last hour") + card("Markets tracked", num(o.markets), "with completed-sale statistics", "blue")
+        + card("Sales, 24 h", num(o.sales24h), "in the feed window") + card("Revenue, 24 h", money(o.revenueByHour.reduce((a, b) => a + b, 0)), "sum of sale prices", "good") + card("Busiest hour", num(Math.max(...o.countByHour)), "sales in one hour") + card("Quietest hour", num(Math.min(...o.countByHour)), "sales in one hour", "muted");
+      drawHourly(o);
+      const rev24 = o.revenueByHour.reduce((a, b) => a + b, 0);
+      $("tiers").innerHTML = o.tiers.map(t => card(t.tier, money(t.revenue), num(t.sales) + " sales · " + t.markets + " markets · " + (rev24 ? Math.round(t.revenue / rev24 * 100) : 0) + "% of revenue", "gold")).join("");
+      const top = (o.byRevenue[0] || {}).revenue || 1;
+      $("byRevenue").querySelector("tbody").innerHTML = o.byRevenue.map(r => `<tr class="row" data-item="${r.itemKey}"><td>${itemCell(r.itemKey)}</td><td><span class="share"><i style="width:${Math.max(2, Math.round(r.revenue / top * 100))}%"></i></span></td><td class="num">${num(r.sales)}</td><td class="num sec">${money(r.averageTicket)}</td><td class="num good">${money(r.revenue)}</td></tr>`).join("");
+      $("edge").querySelector("tbody").innerHTML = o.edge.map(r => `<tr class="row" data-item="${r.itemKey}"><td>${itemCell(r.itemKey, bucketCount(r.bucket))}</td><td class="num sec">${money(r.quick)}</td><td class="num sec">${money(r.patient)}</td><td class="num">${r.spreadPercent.toFixed(0)}%</td><td class="num sec">${r.salesPerHour.toFixed(1)}</td><td class="num good">${money(r.profitPerHour)}</td><td class="num ${r.confidence >= 0.5 ? "good" : "warn"}">${pct(r.confidence)}</td></tr>`).join("") || `<tr><td colspan="7" class="muted">no tracked market shows a 3% spread right now</td></tr>`;
+      $("biggest").querySelector("tbody").innerHTML = (o.biggest || []).map(x => `<tr class="row" data-item="${x.itemKey}"><td class="sec">${when(x.soldAt)}</td><td>${itemCell(x.itemKey, x.itemCount)}${x.components ? `<div class="tags">${partsOf(x.components)}</div>` : ""}</td><td>${x.sellerName}</td><td class="num gold">${money(x.totalPrice)}</td></tr>`).join("");
+      $("hottest").querySelector("tbody").innerHTML = o.hottest.map(r => `<tr class="row" data-item="${r.itemKey}"><td>${itemCell(r.itemKey)}</td><td class="trend"><canvas class="spark" data-item="${r.itemKey}"></canvas></td><td class="num">${num(r.sales)}</td><td class="num good">${money(r.revenue)}</td></tr>`).join("");
+      $("movers").querySelector("tbody").innerHTML = o.movers.map(r => `<tr class="row" data-item="${r.itemKey}"><td>${itemCell(r.itemKey, bucketCount(r.bucket))}</td><td class="trend"><canvas class="spark" data-item="${r.itemKey}"></canvas></td><td class="num">${money(r.median)}</td><td class="num ${r.trend >= 0 ? "good" : "bad"}">${r.trend >= 0 ? "+" : ""}${pct(r.trend)}</td><td class="num sec">${r.salesPerHour.toFixed(1)}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">no market moved more than 2% in the window</td></tr>`;
+      bindRows(); paintSparks($("page-overview"));
+    } catch (e) { $("cards").innerHTML = card("Error", e.message, "", "bad"); }
+  }
+
+  let liveTimer = null, liveRows = [];
+  async function loadLive() {
+    if (!key) return;
+    try {
+      liveRows = await api("/v1/listings?limit=200");
+      $("liveStamp").textContent = liveRows.length + " listings in the last hour";
+      renderLive();
+    } catch (e) { $("liveTable").querySelector("tbody").innerHTML = `<tr><td colspan="8" class="bad">${e.message}</td></tr>`; }
+  }
+  function renderLive() {
+    const f = $("liveFilter").value.trim().toLowerCase(), deals = $("dealsOnly").checked;
+    const rows = liveRows.filter(r => (!f || r.itemKey.includes(f) || (r.sellerName || "").toLowerCase().includes(f)) && (!deals || (r.discount != null && r.discount > 0)));
+    $("liveTable").querySelector("tbody").innerHTML = rows.map(r => {
+      const unit = r.totalPrice / r.itemCount, deal = r.discount != null && r.discount > 0.03;
+      return `<tr class="row" data-item="${r.itemKey}" style="${deal ? "background:#12261a" : ""}"><td class="sec">${when(r.observedAt)}</td><td>${itemCell(r.itemKey, r.itemCount)}</td><td>${r.sellerName || ""}</td><td class="num">${money(r.totalPrice)}</td><td class="num sec">${money(unit)}</td><td class="num sec">${r.quick != null ? money(r.quick) : "—"}</td><td class="num ${r.discount == null ? "muted" : r.discount > 0 ? "good" : "bad"}">${r.discount == null ? "—" : (r.discount > 0 ? "-" : "+") + Math.abs(r.discount * 100).toFixed(0) + "%"}</td><td class="num sec">${r.salesPerHour != null ? r.salesPerHour.toFixed(1) : "—"}</td></tr>`;
+    }).join("") || `<tr><td colspan="8" class="muted">${liveRows.length ? "nothing matches" : "no listings seen yet; the live lane needs a polling server"}</td></tr>`;
+    bindRows();
+  }
+  $("liveFilter").oninput = renderLive;
+  $("dealsOnly").onchange = renderLive;
+
+  async function loadOpps() {
+    if (!key) return;
+    const cap = Number(($("cap").value || "").replace(/[^0-9]/g, "")) || 200000;
+    try {
+      const rows = await api("/v1/opportunities?cap=" + cap);
+      rows.sort((a, b) => b.expectedNetProfit - a.expectedNetProfit);
+      $("oppCount").textContent = rows.length + " signals";
+      $("oppTable").querySelector("tbody").innerHTML = rows.slice(0, 200).map(o => `<tr class="row" data-item="${o.listing.itemKey}"><td>${itemCell(o.listing.itemKey, o.listing.itemCount)}</td><td class="trend"><canvas class="spark" data-item="${o.listing.itemKey}"></canvas></td><td class="num">${money(o.buyPrice)}</td><td class="num">${money(o.recommendedSellPrice)}</td><td class="num good">${money(o.expectedNetProfit)}</td><td class="num good">${o.expectedRoiPercent.toFixed(0)}%</td><td class="num sec">${o.estimatedHoldHours < 1 ? Math.round(o.estimatedHoldHours * 60) + "m" : o.estimatedHoldHours.toFixed(1) + "h"}</td><td class="num warn">${pct(o.confidence)}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">no market clears the profit and confidence rules right now</td></tr>`;
+      bindRows(); paintSparks($("page-opportunities"));
+    } catch (e) { $("oppTable").querySelector("tbody").innerHTML = `<tr><td colspan="8" class="bad">${e.message}</td></tr>`; }
+  }
+  $("reloadOpps").onclick = loadOpps;
+  $("cap").onkeydown = (e) => { if (e.key === "Enter") loadOpps(); };
+
+  let markets = [], sortKey = "salesPerHour", sortDesc = true;
+  async function loadMarkets() {
+    if (!key) return;
+    try { markets = await api("/v1/markets"); renderMarkets(); } catch (e) { $("marketTable").querySelector("tbody").innerHTML = `<tr><td colspan="8" class="bad">${e.message}</td></tr>`; }
+  }
+  function renderMarkets() {
+    const f = $("filter").value.trim().toLowerCase();
+    let rows = markets.filter(m => !f || m.itemKey.includes(f));
+    rows.sort((a, b) => { const x = a[sortKey], y = b[sortKey]; return (typeof x === "string" ? x.localeCompare(y) : x - y) * (sortDesc ? -1 : 1); });
+    $("marketCount").textContent = rows.length + " markets";
+    document.querySelectorAll("#marketTable th").forEach(th => th.classList.toggle("sorted", th.dataset.k === sortKey));
+    $("marketTable").querySelector("tbody").innerHTML = rows.slice(0, 300).map(m => `<tr class="row" data-item="${m.itemKey}"><td>${itemCell(m.itemKey, bucketCount(m.bucket))}</td><td class="num">${money(m.weightedMedian)}</td><td class="num sec">${money(m.quickSalePrice)}</td><td class="num sec">${money(m.patientSalePrice)}</td><td class="num">${m.salesPerHour.toFixed(1)}</td><td class="num ${m.trend >= 0 ? "good" : "bad"}">${(m.trend * 100).toFixed(0)}%</td><td class="num warn">${pct(m.confidence)}</td><td class="num muted">${m.sampleCount}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">nothing matches</td></tr>`;
+    bindRows();
+  }
+  $("filter").oninput = renderMarkets;
+  document.querySelectorAll("#marketTable th").forEach(th => th.onclick = () => { if (sortKey === th.dataset.k) sortDesc = !sortDesc; else { sortKey = th.dataset.k; sortDesc = th.dataset.k !== "itemKey"; } renderMarkets(); });
+
+  function bindRows() {
+    document.querySelectorAll("tr.row[data-item]").forEach(tr => {
+      tr.onclick = () => openItem(tr.dataset.item);
+      tr.onmouseenter = (e) => showHover(tr.dataset.item, e);
+      tr.onmousemove = (e) => placeHover(e);
+      tr.onmouseleave = hideHover;
+    });
+  }
+
+  let itemChart = null;
+  function openItem(k) { $("item").value = base(k); location.hash = "item"; show("item"); loadItem(); }
+  function drawItem(pts, med) {
+    const c = $("itemChart"); const box = c.parentElement; const w = c.width = box.clientWidth, h = c.height = box.clientHeight; const g = c.getContext("2d");
+    g.clearRect(0, 0, w, h);
+    if (!pts.length) { g.fillStyle = "#898a92"; g.font = "12px JetBrains Mono, monospace"; g.fillText("no sales in this window", 12, 24); return; }
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y).sort((a, b) => a - b), x0 = Math.min(...xs), x1 = Math.max(...xs), left = 58, bottom = h - 22;
+    // axis from the 2nd to the 98th percentile so a few wild sales do not flatten the line
+    const lo = ys[Math.floor(ys.length * 0.02)], hi = ys[Math.min(ys.length - 1, Math.floor(ys.length * 0.98))], pad = Math.max((hi - lo) * 0.15, hi * 0.02);
+    const ymin = Math.max(0, lo - pad), ymax = hi + pad;
+    const X = (x) => left + (x - x0) / Math.max(1, x1 - x0) * (w - left - 10), Y = (y) => bottom - Math.max(0, Math.min(1, (y - ymin) / Math.max(1e-9, ymax - ymin))) * (bottom - 12);
+    g.strokeStyle = "#1e222c"; g.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) { const v = ymin + (ymax - ymin) * i / 4, y = Y(v); g.beginPath(); g.moveTo(left, y); g.lineTo(w - 10, y); g.stroke(); g.fillStyle = "#898a92"; g.font = "10px JetBrains Mono, monospace"; g.fillText(money(v), 4, y + 3); }
+    for (let i = 0; i <= 6; i++) { const x = x0 + (x1 - x0) * i / 6; g.fillStyle = "#898a92"; g.fillText(when(x), X(x) - 14, h - 6); }
+    g.fillStyle = "rgba(77,155,255,.75)"; pts.forEach(p => g.fillRect(X(p.x) - 1, Y(p.y) - 1, 3, 3));
+    g.strokeStyle = "#ffd966"; g.lineWidth = 2; g.beginPath(); med.forEach((p, i) => i ? g.lineTo(X(p.x), Y(p.y)) : g.moveTo(X(p.x), Y(p.y))); g.stroke();
+  }
+  function drawAsks(asks, since) {
+    const c = $("askChart"); const box = c.parentElement; const w = c.width = box.clientWidth, h = c.height = box.clientHeight; const g = c.getContext("2d");
+    g.clearRect(0, 0, w, h);
+    g.font = "10px JetBrains Mono, monospace";
+    if (!asks || !asks.length) { g.fillStyle = "#898a92"; g.font = "12px JetBrains Mono, monospace"; g.fillText("no listings observed for this item in the window", 12, 24); return; }
+    const x0 = since, x1 = Date.now(), ys = asks.map(a => a[1]), ymax = Math.max(...ys) * 1.08, ymin = Math.min(...ys) * 0.92, left = 58, bottom = h - 22;
+    const X = (x) => left + (x - x0) / Math.max(1, x1 - x0) * (w - left - 10), Y = (y) => bottom - (y - ymin) / Math.max(1e-9, ymax - ymin) * (bottom - 12);
+    g.strokeStyle = "#1e222c"; g.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) { const v = ymin + (ymax - ymin) * i / 4, y = Y(v); g.beginPath(); g.moveTo(left, y); g.lineTo(w - 10, y); g.stroke(); g.fillStyle = "#898a92"; g.fillText(money(v), 4, y + 3); }
+    for (let i = 0; i <= 6; i++) { const x = x0 + (x1 - x0) * i / 6; g.fillStyle = "#898a92"; g.fillText(when(x), X(x) - 14, h - 6); }
+    g.strokeStyle = "#4d9bff"; g.lineWidth = 2; g.beginPath();
+    asks.forEach((a, i) => { const x = X(a[0]), y = Y(a[1]); if (i) { g.lineTo(x, y); } else g.moveTo(x, y); const nx = i + 1 < asks.length ? X(asks[i + 1][0]) : X(x1); g.lineTo(nx, y); });
+    g.stroke();
+    const last = asks[asks.length - 1]; g.fillStyle = "#ffd966"; g.fillText("lowest ask now " + money(last[1]), w - 170, 12);
+  }
+  async function loadItem() {
+    const raw = $("item").value.trim(); if (!raw || !key) return;
+    const id = raw.includes(":") ? raw : "minecraft:" + raw;
+    const hours = Number($("window").value), since = Date.now() - hours * 3600e3;
+    $("itemTitle").innerHTML = `${title(id)} <span class="hint">· ${hours} h window</span>`;
+    try {
+      const m = await api("/v1/market/" + encodeURIComponent(id) + "?since=" + since + "&limit=5000");
+      const pts = m.sales.map(s => ({ x: s.soldAt, y: s.totalPrice / s.itemCount }));
+      const buckets = new Map();
+      for (const p of pts) { const b = Math.floor(p.x / 3600e3) * 3600e3; (buckets.get(b) || buckets.set(b, []).get(b)).push(p.y); }
+      const med = [...buckets.entries()].sort((a, b) => a[0] - b[0]).map(([t, ys]) => { ys.sort((a, b) => a - b); return { x: t + 1800e3, y: ys[Math.floor(ys.length / 2)] }; });
+      drawItem(pts, med);
+      drawAsks(m.asks, since);
+      const chg = m.change24h;
+      $("ihead").hidden = false;
+      $("ihead").innerHTML = `<img class="big" src="/assets/items/${base(id).replace("minecraft:", "")}.png" alt="" onerror="this.style.visibility='hidden'"><div><div class="nm">${title(id)}</div><div class="hint">${num(m.sales24h)} sales in 24 h · ${num(m.sales.length)} in window · median unit price</div></div><div style="margin-left:auto"><div class="val">${m.value != null ? money(m.value) : "—"}</div><div class="chg ${chg == null ? "muted" : chg >= 0 ? "good" : "bad"}">${chg == null ? "no previous day to compare" : (chg >= 0 ? "+" : "") + (chg * 100).toFixed(1) + "% vs previous 24 h"}</div></div>`;
+      const s = m.stats;
+      $("itemCards").innerHTML = card("Median", s ? money(s.weightedMedian) : "—", s ? bucketCount(s.bucket) + " stack" : "") + card("Quick · patient", s ? money(s.quickSalePrice) + " · " + money(s.patientSalePrice) : "—", "sell-now and hold-out bands", "good") + card("Sales per hour", s ? s.salesPerHour.toFixed(1) : "—", m.sales.length + " in window", "blue") + card("Confidence", s ? pct(s.confidence) : "—", s ? s.sampleCount + " samples" : "", "warn");
+      $("ranges").querySelector("tbody").innerHTML = m.ranges.map(r => `<tr><td>${r.label}</td><td class="num">${num(r.count)}</td><td class="num sec">${r.count ? money(r.low) : "—"}</td><td class="num gold">${r.count ? money(r.median) : "—"}</td><td class="num sec">${r.count ? money(r.high) : "—"}</td></tr>`).join("");
+      const attached = m.sales.filter(x => x.components).length;
+      $("itemSales").querySelector("tbody").innerHTML = m.sales.slice(-60).reverse().map(x => `<tr><td class="sec">${when(x.soldAt)}</td><td>${x.sellerName}</td><td class="tags">${x.components ? partsOf(x.components) : `<span class="muted">·</span>`}</td><td class="num">${x.itemCount}</td><td class="num">${money(x.totalPrice)}</td><td class="num sec">${money(x.totalPrice / x.itemCount)}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">no sales in this window</td></tr>`;
+      let rows = hoverCache.get(base(id));
+      if (!rows) { try { rows = await api("/v1/components/" + encodeURIComponent(base(id)) + "?limit=60"); } catch (err) { rows = []; } hoverCache.set(base(id), rows); }
+      const seen = new Set(); let html = "";
+      for (const r of rows) { if (seen.has(r.key)) continue; seen.add(r.key); html += `<div class="v"><span class="price">${money(r.price)}</span>×${r.count} <span class="age muted">${Math.round((Date.now() - r.observedAt) / 3600e3)}h ago</span><br>${partsOf(r.descriptor) || `<span class="muted">plain</span>`}</div>`; if (seen.size >= 10) break; }
+      $("itemSeen").innerHTML = html || `<div class="muted">Nothing seen on the page yet. ${attached ? "" : "Enchantments come from clients reading the auction page; the feed does not carry them."}</div>`;
+    } catch (e) { $("itemCards").innerHTML = card("Error", e.message, "", "bad"); }
+  }
+  $("lookup").onclick = loadItem;
+  $("item").onkeydown = (e) => { if (e.key === "Enter") loadItem(); };
+
+  async function loadSellers() {
+    if (!key) return;
+    try {
+      const rows = await api("/v1/rivals");
+      $("sellerTable").querySelector("tbody").innerHTML = rows.slice(0, 80).map(r => `<tr class="row" data-seller="${r.seller}"><td>${r.seller}</td><td class="num">${num(r.sales)}</td><td class="num sec">${money(r.revenue)}</td><td class="num sec">${r.items}</td><td class="num sec">${r.activeHours}/24</td><td><span class="${r.botScore >= 60 ? "warn" : "sec"}">${r.botScore}%</span></td></tr>`).join("");
+      document.querySelectorAll("tr.row[data-seller]").forEach(tr => tr.onclick = () => loadSeller(tr.dataset.seller));
+    } catch (e) { $("sellerTable").querySelector("tbody").innerHTML = `<tr><td colspan="6" class="bad">${e.message}</td></tr>`; }
+  }
+  async function loadSeller(s) {
+    try {
+      const sales = await api("/v1/seller/" + encodeURIComponent(s));
+      $("sellerDetail").hidden = false; $("sellerName").textContent = s + " · last 24 h";
+      $("sellerSales").querySelector("tbody").innerHTML = sales.slice(0, 60).map(x => `<tr class="row" data-item="${x.itemKey}"><td class="sec">${when(x.soldAt)}</td><td>${itemCell(x.itemKey)}</td><td class="num">${x.itemCount}</td><td class="num">${money(x.totalPrice)}</td></tr>`).join("");
+      bindRows(); $("sellerDetail").scrollIntoView({ behavior: "smooth" });
+    } catch (e) {}
+  }
+
+  // hover card: everything clients saw attached to this item on the auction page
+  const hoverCache = new Map();
+  const roman = (n) => ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"][n] || n;
+  const partsOf = (d, depth = 0) => {
+    let h = "";
+    if (d.enchantments) for (const [k, v] of Object.entries(d.enchantments)) h += `<span class="part">${title(k)} ${roman(v)}</span>`;
+    if (d.potion) h += `<span class="part effect">${title(d.potion)}</span>`;
+    if (d.effects) for (const e of d.effects) { const [id, amp, dur] = e.split("/"); h += `<span class="part effect">${title(id)} ${roman(Number(amp))} · ${Math.round(dur / 20)}s</span>`; }
+    if (d.trim) h += `<span class="part trim">trim ${title(d.trim.split("+")[0])}</span>`;
+    if (d.contents && depth < 2) for (const c of d.contents) h += `<span class="part inner">${title(c.item)} ×${c.count}${partsOf(c, depth + 1) ? " ✦" : ""}</span>`;
+    return h;
+  };
+  let hoverItem = null;
+  async function showHover(itemKey, e) {
+    const id = base(itemKey); hoverItem = id;
+    const box = $("hover"); box.innerHTML = `<h3>${title(id)} <span>looking…</span></h3>`; box.style.display = "block"; placeHover(e);
+    let rows = hoverCache.get(id);
+    if (!rows) { try { rows = await api("/v1/components/" + encodeURIComponent(id) + "?limit=30"); } catch (err) { rows = []; } hoverCache.set(id, rows); }
+    if (hoverItem !== id) return;
+    if (!rows.length) { box.innerHTML = `<h3>${title(id)} <span>plain</span></h3><div class="none">No enchantments, effects or contents seen on this item.</div>`; return; }
+    const seen = new Set(); let html = `<h3>${title(id)} <span>${rows.length} seen</span></h3>`;
+    for (const r of rows) {
+      if (seen.has(r.key)) continue; seen.add(r.key);
+      html += `<div class="v"><span class="price">${money(r.price)}</span>×${r.count} <span class="age">${Math.round((Date.now() - r.observedAt) / 3600e3)}h ago</span><br>${partsOf(r.descriptor) || `<span class="none">plain</span>`}</div>`;
+      if (seen.size >= 8) break;
+    }
+    box.innerHTML = html;
+  }
+  function placeHover(e) { const box = $("hover"); box.style.left = Math.min(e.clientX + 16, innerWidth - 376) + "px"; box.style.top = Math.max(8, Math.min(e.clientY + 14, innerHeight - box.offsetHeight - 10)) + "px"; }
+  function hideHover() { hoverItem = null; $("hover").style.display = "none"; }
+
+  health(); setInterval(health, 30000);
+  show(current());
+  addEventListener("resize", () => { if (current() === "item") loadItem(); if (current() === "overview" && lastOverview) drawHourly(lastOverview); });
+})();
+</script>
+</body>
+</html>

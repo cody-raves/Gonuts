@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "doughbay",
+  "version": "${version}",
+  "name": "GoNuts",
+  "description": "Auction analysis and verified execution for DonutSMP: collects market data, values items, finds resale opportunities, and can execute exact-match trades.",
+  "authors": ["cody-raves"],
+  "contact": {
+    "sources": "https://github.com/cody-raves/GoNuts"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.doughbay.fabric.DoughBayClient"]
+  },
+  "mixins": [
+    "doughbay.client.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_dependency}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

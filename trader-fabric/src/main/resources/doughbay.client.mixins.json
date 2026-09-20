@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "dev.doughbay.fabric.mixin",
+  "client": [
+    "CommandSendMixin",
+    "ClientPacketListenerMixin",
+    "DialogScreenAccessor",
+    "FramerateLimitTrackerMixin",
+    "KeyMappingAccessor",
+    "ContainerScreenMixin",
+    "LevelExtractorMixin",
+    "MinecraftInvoker"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

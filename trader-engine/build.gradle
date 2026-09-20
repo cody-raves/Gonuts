@@ -1,0 +1,7 @@
+// Shared orchestration used by both the CLI and the Minecraft mod:
+// collection, analysis, and opportunity detection over the API + storage.
+dependencies {
+    api project(':trader-core')
+    api project(':trader-api')
+    api project(':trader-storage')
+}

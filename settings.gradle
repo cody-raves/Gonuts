@@ -1,0 +1,25 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'doughbay'
+
+include 'trader-core'
+include 'trader-api'
+include 'trader-storage'
+include 'trader-paper'
+include 'trader-engine'
+include 'trader-cli'
+
+// The Minecraft mod. Building it downloads and remaps Minecraft, which is slow
+// and unnecessary for headless use — build just the CLI with:
+//   ./gradlew :trader-cli:build
+include 'trader-fabric'
+include 'trader-server'

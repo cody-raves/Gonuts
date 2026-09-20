@@ -1,0 +1,27 @@
+# Build output
+build/
+.gradle/
+out/
+/trader-fabric/run/
+
+# Local data and secrets — never commit API keys or collected market data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+secret.dat
+doughbay.json
+doughbay.local.json
+doughbay-local.json
+discord.json
+.env
+doughbay-server.json
+
+# Minecraft client logs — noise, never version-controlled
+trader-fabric/logs/
+trader-fabric/run/logs/
+**/logs/*.log
+**/logs/*.log.gz
+# local export/scratch artifacts
+scratchpad/

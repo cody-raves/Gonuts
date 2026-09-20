@@ -1,0 +1,9 @@
+{
+  "key.doughbay.open": "Open GoNuts",
+  "key.doughbay.emergency_stop": "GoNuts emergency stop",
+  "key.category.doughbay.main": "GoNuts",
+  "key.doughbay.peek": "GoNuts peek (hold to reveal)",
+  "key.doughbay.stash": "Stash desk: right-click / index",
+  "key.doughbay.list_inventory": "GoNuts: list inventory now",
+  "key.doughbay.resume": "GoNuts: resume session"
+}

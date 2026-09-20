@@ -1,0 +1,34 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':trader-core')
+    implementation project(':trader-engine')
+    implementation project(':trader-api')
+    implementation project(':trader-storage')
+    implementation project(':trader-paper')
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+}
+
+application {
+    mainClass = 'dev.doughbay.cli.Main'
+}
+
+// Self-contained doughbay.jar so the plan's `java -jar doughbay.jar ...`
+// commands work without a classpath.
+tasks.register('fatJar', Jar) {
+    archiveBaseName = 'doughbay'
+    archiveClassifier = ''
+    archiveVersion = ''
+    manifest {
+        attributes 'Main-Class': 'dev.doughbay.cli.Main'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    dependsOn configurations.runtimeClasspath
+    from sourceSets.main.output
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+build.dependsOn fatJar

@@ -29,21 +29,41 @@ public interface AutomationPersistencePort extends AutoCloseable {
         return java.util.List.of();
     }
 
+    /**
+     * The account this port writes as, or "" when the ledger has one owner.
+     * Position ids are the ledger's global primary key, so a client sharing a
+     * ledger has to know which account it mints them for.
+     */
+    default String client() {
+        return "";
+    }
+
     enum LoadState { NOT_STARTED, LOADING, READY, FAILED, CLOSED }
 
     record Status(LoadState loadState,
                   AutomationSessionRecovery recovery,
                   long lastAcceptedGeneration,
                   long lastDurableGeneration,
-                  String detail) {
+                  String detail,
+                  long lastRefusedGeneration) {
         public Status {
             loadState = loadState == null ? LoadState.FAILED : loadState;
             recovery = recovery == null ? AutomationSessionRecovery.empty() : recovery;
             detail = detail == null ? "" : detail;
+            lastRefusedGeneration = Math.max(0, lastRefusedGeneration);
             if (lastAcceptedGeneration < 0 || lastDurableGeneration < 0
                     || lastDurableGeneration > lastAcceptedGeneration) {
                 throw new IllegalArgumentException("invalid persistence generations");
             }
+        }
+
+        /** Source-compatible constructor for callers that report no refusal. */
+        public Status(LoadState loadState,
+                      AutomationSessionRecovery recovery,
+                      long lastAcceptedGeneration,
+                      long lastDurableGeneration,
+                      String detail) {
+            this(loadState, recovery, lastAcceptedGeneration, lastDurableGeneration, detail, 0);
         }
 
         public boolean ready() {
@@ -52,6 +72,25 @@ public interface AutomationPersistencePort extends AutoCloseable {
 
         public boolean durable(long generation) {
             return generation > 0 && ready() && lastDurableGeneration >= generation;
+        }
+
+        /**
+         * The ledger rejected this write: the row was refused, the transaction
+         * rolled back, and nothing it described was recorded. It will never
+         * become durable, so a caller waiting on it must stop waiting.
+         */
+        public boolean refused(long generation) {
+            return generation > 0 && lastRefusedGeneration >= generation
+                    && lastDurableGeneration < generation;
+        }
+
+        /**
+         * A refused write that no later write has superseded. Writes are
+         * applied in order, so a newer durable generation means the refusal is
+         * behind us.
+         */
+        public boolean refusalOutstanding() {
+            return lastRefusedGeneration > lastDurableGeneration;
         }
     }
 

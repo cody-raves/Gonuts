@@ -4,6 +4,9 @@ What each build changed, newest first. Times are UTC. The mod shows these in
 the update notice, after an update installs, and under What's new on the
 About tab.
 
+## 2026-10-14 21:55 UTC
+- Fixed: with two clients sharing one ledger, retail singles could be prepared with a position id the other client had already used, which refused the save ("Retail child position id is already in use"), stopped all further record-keeping and left the bid desk pausing and auto-resuming for hours without being able to stop; ids are now unique per account and a refused save no longer takes the ledger writer down with it. (#5)
+
 ## 2026-10-14 17:21 UTC
 - Bug reports can now include a locally filtered GoNuts log excerpt after an authenticated receiver-capabilities check. Include log is enabled by default when the receiver advertises schema 2; older receivers retain diagnostics-only schema 1. The attachment is shown in the preview before explicit public-report consent, and changing the attachment choice requires preparing and reviewing again.
 - Privacy: the excerpt regenerates recognized state/action/exception events and verified GoNuts source frames instead of copying log messages. Chat, usernames, identities, coordinates, credentials, addresses, personal paths and foreign stack frames are omitted. Both client and receiver enforce byte and line limits; there is no raw-log fallback.

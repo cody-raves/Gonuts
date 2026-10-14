@@ -1246,12 +1246,7 @@ public final class AutomationSessionController {
     private String detail = "Automation session is stopped";
     private static final Logger LOGGER = LoggerFactory.getLogger("doughbay-automation");
     private String lastLoggedDetail = "";
-    private long nextPositionId = Math.max(1, System.currentTimeMillis());
-    /** Low bits of a position id: the millisecond-seeded counter above. */
-    private static final int POSITION_ID_COUNTER_BITS = 43;
-    private static final long POSITION_ID_COUNTER_MASK = (1L << POSITION_ID_COUNTER_BITS) - 1;
-    /** High bits: which account minted the id. 0 is a ledger with one owner. */
-    private static final long POSITION_ID_SPACES = 1L << 19;
+
     private long candidateCoverageBoundaryMillis;
 
     private String firstCoveragePhase = "";
@@ -2744,9 +2739,6 @@ public final class AutomationSessionController {
         trackedPosition = recoveredOpenPositions.size() == 1
                 ? recoveredOpenPositions.getFirst() : null;
         boundListingKey = recovery.boundListingKey();
-        nextPositionId = Math.max(nextPositionId,
-                recovery.openPositions().stream().mapToLong(Position::positionId)
-                        .max().orElse(0) + 1);
         pendingOpportunity = null;
         positionValuation = null;
         pausedFromState = parseState(recovery.controllerState());
@@ -6950,43 +6942,10 @@ public final class AutomationSessionController {
         return bookCollected(client, now, itemId, count, unitPrice, unitPrice * (long) count);
     }
 
-    /**
-     * The next position id for this account.
-     *
-     * <p>A position id is the ledger's global primary key and several clients
-     * may share one ledger. A counter seeded from the wall clock is not enough
-     * for that: two clients launched by the same script start a few
-     * milliseconds apart, the busier one consumes more ids than the gap (a
-     * retail peel burns two), and it then walks into ids the other client has
-     * already written. The ledger refuses the write - "Retail child position
-     * id is already in use" - in the middle of splitting a batch into singles.
-     *
-     * <p>So each account mints inside its own space: the high bits come from
-     * the account name, the low bits stay the millisecond-seeded counter. Two
-     * accounts share a space only if their names collide in nineteen bits of
-     * hash, instead of whenever their clocks line up. Space 0 belongs to an
-     * unnamed single-owner ledger and to every id written before this existed,
-     * so a client still on the old build cannot be walked into either.
-     */
+    /** Consumes an ID leased durably off-thread from the shared ledger. */
     private long allocatePositionId() {
-        long space = accountPositionIdSpace();
-        if (space != 0 && (nextPositionId & ~POSITION_ID_COUNTER_MASK) != space) {
-            // Keep the counter where it is inside the new space: it is seeded
-            // from the clock, so it stays above every id this account has used.
-            nextPositionId = space | (nextPositionId & POSITION_ID_COUNTER_MASK);
-        }
-        return nextPositionId++;
-    }
-
-    /** The high bits of this account's position ids, or 0 if it has no name. */
-    private long accountPositionIdSpace() {
-        String account = persistence == null ? "" : persistence.client();
-        if (account == null || account.isBlank()) return 0;
-        long hash = 0x811C9DC5L;                       // FNV-1a, 32-bit
-        for (int i = 0; i < account.length(); i++) {
-            hash = ((hash ^ account.charAt(i)) * 16777619L) & 0xFFFFFFFFL;
-        }
-        return (1 + hash % (POSITION_ID_SPACES - 1)) << POSITION_ID_COUNTER_BITS;
+        if (persistence == null) throw new IllegalStateException("Automation persistence is unavailable");
+        return persistence.allocatePositionId();
     }
 
     /**
@@ -11781,6 +11740,8 @@ public final class AutomationSessionController {
     private String persistenceHealthBlocker() {
         if (persistence == null) return "Automation persistence is unavailable";
         AutomationPersistencePort.Status status = persistence.status();
+        if (status.refusalOutstanding()) return "A durable automation write was refused; reconcile or restart before resuming";
+        if (status.ready() && !persistence.positionIdsAvailable()) return "Waiting for durable position ID lease";
         return status.ready() ? null
                 : "Automation persistence is " + status.loadState()
                 + (status.detail().isBlank() ? "" : ": " + status.detail());
@@ -11964,7 +11925,7 @@ public final class AutomationSessionController {
     private void checkStuckPersistence(long now) {
         if (persistence == null) return;
         AutomationPersistencePort.Status status = persistence.status();
-        if (!status.ready() || status.lastAcceptedGeneration() <= status.lastDurableGeneration()) {
+        if (!status.ready()) {
             pendingPersistenceSince = 0;
             return;
         }
@@ -11977,6 +11938,10 @@ public final class AutomationSessionController {
             if (isRunning()) {
                 pauseInternal("A durable automation write was refused: " + status.detail());
             }
+            return;
+        }
+        if (status.lastAcceptedGeneration() <= status.lastDurableGeneration()) {
+            pendingPersistenceSince = 0;
             return;
         }
         if (pendingPersistenceSince == 0

@@ -168,6 +168,13 @@ public final class Database implements AutoCloseable {
             }
             setVersion(18);
         }
+        if (version < 19) {
+            try (Statement st = connection.createStatement()) {
+                st.execute("CREATE TABLE IF NOT EXISTS position_id_allocator (singleton_id INTEGER PRIMARY KEY CHECK(singleton_id=1), next_id INTEGER NOT NULL)");
+                st.execute("INSERT OR IGNORE INTO position_id_allocator(singleton_id,next_id) VALUES (1," + PositionIdAllocator.FIRST_ID + ")");
+            }
+            setVersion(19);
+        }
     }
 
     /**

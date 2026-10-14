@@ -6,8 +6,8 @@ import dev.doughbay.core.model.StackBucket;
 import dev.doughbay.fabric.AutomatedExecutionDriver;
 import dev.doughbay.storage.AutomationPersistenceWorker;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -25,16 +25,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ("Retail child position id is already in use").
  */
 final class SharedLedgerPositionIdTest {
+    @TempDir Path temp;
 
     @Test
     void twoAccountsOnOneLedgerNeverMintTheSamePositionId() throws Exception {
-        AutomationSessionController alice = controllerAs("Alice");
-        AutomationSessionController bob = controllerAs("Bob");
-        // Launched a few milliseconds apart, as two clients started by the same
-        // script are. Each retail peel burns two ids, so the earlier client
-        // overtakes the later one within a single batch of singles.
-        setField(alice, "nextPositionId", 1_791_999_128_679L);
-        setField(bob, "nextPositionId", 1_791_999_128_682L);
+        AutomationPersistenceWorker first = workerAs("Trader2476");
+        AutomationPersistenceWorker second = workerAs("Trader4130");
+        try {
+        AutomationSessionController alice = controllerAs(first);
+        AutomationSessionController bob = controllerAs(second);
+        // These two legal names collide under the former 19-bit account hash.
+        // Their workers now reserve separate ranges on the same SQLite ledger.
 
         Set<Long> aliceIds = mint(alice, 64);
         Set<Long> bobIds = mint(bob, 64);
@@ -46,14 +47,30 @@ final class SharedLedgerPositionIdTest {
                         + aliceIds.stream().filter(bobIds::contains).toList());
         assertTrue(aliceIds.stream().allMatch(id -> id > 0), "position ids stay positive");
         assertTrue(bobIds.stream().allMatch(id -> id > 0), "position ids stay positive");
+        } finally { closeAndAwait(first); closeAndAwait(second); }
     }
 
-    private static AutomationSessionController controllerAs(String account) {
-        // The worker is never started: nothing here touches SQLite, only the
-        // account identity the controller mints ids for.
+    private static void closeAndAwait(AutomationPersistenceWorker worker) throws Exception {
+        worker.close();
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (worker.status().loadState() != dev.doughbay.storage.AutomationPersistencePort.LoadState.CLOSED
+                && System.nanoTime() < deadline) Thread.sleep(10);
+        assertEquals(dev.doughbay.storage.AutomationPersistencePort.LoadState.CLOSED,
+                worker.status().loadState());
+    }
+
+    private AutomationPersistenceWorker workerAs(String account) throws Exception {
         AutomationPersistenceWorker persistence =
-                new AutomationPersistenceWorker(Path.of("shared-ledger.db"));
+                new AutomationPersistenceWorker(temp.resolve("shared-ledger.db"));
         persistence.setClient(account);
+        persistence.start();
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        while (!persistence.status().ready() && System.nanoTime() < deadline) Thread.sleep(10);
+        assertTrue(persistence.status().ready(), persistence.status().detail());
+        return persistence;
+    }
+
+    private static AutomationSessionController controllerAs(AutomationPersistenceWorker persistence) {
         AutomationSessionController controller =
                 new AutomationSessionController(new AutomatedExecutionDriver());
         controller.setPersistence(persistence);
@@ -77,10 +94,4 @@ final class SharedLedgerPositionIdTest {
         return ids;
     }
 
-    private static void setField(Object target, String name, Object value)
-            throws ReflectiveOperationException {
-        Field field = target.getClass().getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 }

@@ -66,8 +66,24 @@ class AutomationPersistenceRefusedWriteTest {
             assertTrue(next > 0, "the worker must still accept writes after a refused one");
             await(() -> worker.status().durable(next));
             assertEquals(2, worker.retailLots().size());
+            org.junit.jupiter.api.Assertions.assertFalse(worker.status().durable(refused), "A refused generation must never become durable merely because a later write succeeded");
+            assertTrue(worker.status().refused(refused));
+            assertTrue(worker.status().refusalOutstanding(), "An unrelated queued write must not clear the refusal latch");
+
+            RetailSplit anotherCollision = RetailSplit.of(clean.remainder(), 2, 6, 20_000);
+            long refusedAgain = worker.submitRetail(checkpoint(anotherCollision.single()),
+                    new RetailLot(2, 1, 20_000), clean.remainder(), anotherCollision.remainder());
+            await(() -> worker.status().refused(refusedAgain));
+            long heartbeat = worker.submit(checkpoint(clean.single()));
+            await(() -> worker.status().durable(heartbeat));
+            assertTrue(worker.status().refused(refused));
+            assertTrue(worker.status().refused(refusedAgain));
+            org.junit.jupiter.api.Assertions.assertFalse(worker.status().durable(refused));
+            org.junit.jupiter.api.Assertions.assertFalse(worker.status().durable(refusedAgain));
+            assertTrue(worker.status().refusalOutstanding());
         } finally {
             worker.close();
+            await(() -> worker.status().loadState() == AutomationPersistencePort.LoadState.CLOSED);
         }
     }
 

@@ -12,6 +12,7 @@ class StaffWatchAlertsTest {
         Path file = directory.resolve("existing-v16.db");
         try (var db = new Database(file); var statement = db.connection().createStatement()) {
             statement.execute("DROP TABLE staff_watch_alerts");
+            statement.execute("DROP TABLE position_id_allocator");
             statement.execute("DELETE FROM schema_version WHERE version > 16");
             statement.execute("INSERT INTO evasion_events(at,client,who,action) VALUES (50,'Bot','Player','existing escape')");
         }
@@ -21,8 +22,9 @@ class StaffWatchAlertsTest {
                 assertTrue(StaffWatchAlerts.pending(db.connection()).isEmpty());
                 try (var rows = statement.executeQuery("SELECT MAX(version) FROM schema_version")) {
                     assertTrue(rows.next());
-                    assertEquals(18, rows.getInt(1));
+                    assertEquals(19, rows.getInt(1));
                 }
+                assertTrue(PositionIdAllocator.reserve(db.connection(), 1) >= PositionIdAllocator.FIRST_ID);
                 try (var rows = statement.executeQuery("SELECT action FROM evasion_events WHERE at=50")) {
                     assertTrue(rows.next());
                     assertEquals("existing escape", rows.getString(1));

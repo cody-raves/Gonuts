@@ -22,6 +22,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class RefusedWriteRecoveryTest {
 
     @Test
+    void unrelatedLaterSaveCannotAcknowledgeARejectedPurchase() throws Exception {
+        FakePersistence persistence = new FakePersistence();
+        AutomationSessionController controller = new AutomationSessionController(new AutomatedExecutionDriver());
+        controller.setPersistence(persistence);
+        setField(controller, "purchasePersistenceGeneration", 8L);
+        setField(controller, "buyIntentPersistenceGeneration", 7L);
+        persistence.status = new AutomationPersistencePort.Status(
+                AutomationPersistencePort.LoadState.READY, persistence.status.recovery(),
+                9, 9, "Unrelated heartbeat durable", 8, java.util.Set.of(8L));
+        var method = AutomationSessionController.class.getDeclaredMethod("processOutOfBandPersistence");
+        method.setAccessible(true);
+        method.invoke(controller);
+        assertEquals(8L, field(controller, "purchasePersistenceGeneration"),
+                "A refused purchase must not be acknowledged by a later heartbeat");
+        assertEquals(7L, field(controller, "buyIntentPersistenceGeneration"),
+                "The purchase failure must retain the outstanding BUY intent");
+        assertTrue(persistence.status.refusalOutstanding());
+        setField(controller, "state", AutomationSessionController.State.SCANNING);
+        setField(controller, "sessionOpen", true);
+        checkWatchdog(controller, 1000);
+        assertEquals(AutomationSessionController.State.PAUSED, controller.snapshot().state());
+    }
+
+    @Test
     void refusedWritePausesAtOnceInsteadOfWaitingOutTheStallBudget() throws Exception {
         FakePersistence persistence = new FakePersistence();
         AutomationSessionController controller =

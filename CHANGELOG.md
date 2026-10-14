@@ -5,7 +5,7 @@ the update notice, after an update installs, and under What's new on the
 About tab.
 
 ## 2026-10-14 21:55 UTC
-- Fixed: with two clients sharing one ledger, retail singles could be prepared with a position id the other client had already used, which refused the save ("Retail child position id is already in use"), stopped all further record-keeping and left the bid desk pausing and auto-resuming for hours without being able to stop; ids are now unique per account and a refused save no longer takes the ledger writer down with it. (#5)
+- Fixed: with two clients sharing one ledger, retail singles could be prepared with a position id the other client had already used, which refused the save ("Retail child position id is already in use"), stopped all further record-keeping and left the bid desk pausing and auto-resuming for hours without being able to stop; position ID ranges are now reserved durably by the shared ledger, and rejected writes stay rejected even after later saves. The writer remains available for safe stop/reconciliation; automatic retries retain exposure and pause until explicit reconciliation or restart. Existing transaction history is preserved. (#5)
 
 ## 2026-10-14 17:21 UTC
 - Bug reports can now include a locally filtered GoNuts log excerpt after an authenticated receiver-capabilities check. Include log is enabled by default when the receiver advertises schema 2; older receivers retain diagnostics-only schema 1. The attachment is shown in the preview before explicit public-report consent, and changing the attachment choice requires preparing and reviewing again.

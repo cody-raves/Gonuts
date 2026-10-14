@@ -45,22 +45,21 @@ public final class PositionRepository {
 
     /** @return the position with its generated id. */
     public Position insert(Position p) throws SQLException {
+        long id = PositionIdAllocator.reserve(db.connection(), 1);
         String sql = """
                 INSERT INTO positions
-                (mode, item_key, stack_bucket, quantity, purchase_price, target_price,
+                (position_id, mode, item_key, stack_bucket, quantity, purchase_price, target_price,
                  purchased_at, listed_at, closed_at, sale_price, realized_profit, status, client, loan_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""";
-        try (PreparedStatement ps = db.connection().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            bind(ps, p);
-            ps.setString(13, client);
-            ps.setLong(14, loanId);
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""";
+        try (PreparedStatement ps = db.connection().prepareStatement(sql)) {
+            ps.setLong(1, id);
+            bind(ps, p, 2);
+            ps.setString(14, client);
+            ps.setLong(15, loanId);
             ps.executeUpdate();
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                long id = keys.next() ? keys.getLong(1) : 0;
-                return new Position(id, p.mode(), p.itemKey(), p.bucket(), p.quantity(),
-                        p.purchasePrice(), p.targetPrice(), p.purchasedAt(), p.listedAt(),
-                        p.closedAt(), p.salePrice(), p.realizedProfit(), p.status());
-            }
+            return new Position(id, p.mode(), p.itemKey(), p.bucket(), p.quantity(),
+                    p.purchasePrice(), p.targetPrice(), p.purchasedAt(), p.listedAt(),
+                    p.closedAt(), p.salePrice(), p.realizedProfit(), p.status());
         }
     }
 

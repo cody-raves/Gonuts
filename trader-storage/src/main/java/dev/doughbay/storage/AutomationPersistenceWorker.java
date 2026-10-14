@@ -29,6 +29,23 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
             "Automation recovery has not started"));
     private volatile boolean running;
     private Thread thread;
+    private final BlockingQueue<Long> positionIds = new ArrayBlockingQueue<>(8192);
+
+    @Override public long allocatePositionId() {
+        if (!running || !status.get().ready())
+            throw new IllegalStateException("Automation persistence is not ready for position ID allocation");
+        Long id = positionIds.poll();
+        if (id == null) throw new IllegalStateException("Waiting for durable position ID lease");
+        return id;
+    }
+
+    @Override public boolean positionIdsAvailable() { return positionIds.size() >= 16; }
+
+    private void replenishPositionIds(Database database) throws java.sql.SQLException {
+        if (positionIds.size() >= 4096) return;
+        long first = PositionIdAllocator.reserve(database.connection(), 4096);
+        for (int i = 0; i < 4096; i++) positionIds.offer(first + i);
+    }
 
     /**
      * The account this worker writes as. Several clients may share one ledger,
@@ -60,7 +77,7 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
         long generation = nextGeneration.incrementAndGet();
         if (!queue.offer(new Retail(generation, checkpoint, lot, parent, remainder))) return 0;
         status.updateAndGet(s -> s.ready() ? new Status(s.loadState(), s.recovery(), generation,
-                s.lastDurableGeneration(), "Retail checkpoint queued", s.lastRefusedGeneration()) : s);
+                s.lastDurableGeneration(), "Retail checkpoint queued", s.lastRefusedGeneration(), s.refusedGenerations()) : s);
         return generation;
     }
 
@@ -107,7 +124,7 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
         status.updateAndGet(current -> current.ready()
                 ? new Status(current.loadState(), current.recovery(), generation,
                 current.lastDurableGeneration(), "Checkpoint queued",
-                current.lastRefusedGeneration())
+                current.lastRefusedGeneration(), current.refusedGenerations())
                 : current);
         return generation;
     }
@@ -125,7 +142,7 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
         status.updateAndGet(current -> current.ready()
                 ? new Status(current.loadState(), current.recovery(), generation,
                 current.lastDurableGeneration(), "Manual resolution queued",
-                current.lastRefusedGeneration())
+                current.lastRefusedGeneration(), current.refusedGenerations())
                 : current);
         return generation;
     }
@@ -148,12 +165,14 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
         long accepted = 0;
         long durable = 0;
         AutomationSessionRecovery recovery = AutomationSessionRecovery.empty();
+        java.util.Set<Long> refused = new java.util.HashSet<>();
         try (Database database = new Database(databasePath)) {
             PositionRepository positions = new PositionRepository(database);
             positions.setClient(client);
             positions.setLoanId(loanId);
             recovery = positions.loadAutomationRecovery();
             retailLots = positions.retailLots();
+            replenishPositionIds(database);
             status.set(new Status(LoadState.READY, recovery, 0, 0,
                     recovery.unresolvedExposure()
                             ? "Recovered unresolved real automation exposure"
@@ -161,6 +180,7 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
                             ? "Recovered open automation session counters"
                             : "Automation recovery complete"));
             while (running || !queue.isEmpty()) {
+                if (running) replenishPositionIds(database);
                 Command command = queue.poll(250, TimeUnit.MILLISECONDS);
                 if (command == null) continue;
                 // The owner is fixed for the session; the funding loan is not,
@@ -199,7 +219,8 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
                     } catch (java.sql.SQLException e) {
                         String message = String.valueOf(e.getMessage()).toLowerCase(java.util.Locale.ROOT);
                         boolean locked = message.contains("locked") || message.contains("busy");
-                        if (locked && attempt < 12) {
+                        if (locked) {
+                            if (attempt >= 12) throw e;
                             Thread.sleep(500L * attempt);
                             continue;
                         }
@@ -215,6 +236,7 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
                 long finalAccepted = Math.max(accepted,
                         status.get().lastAcceptedGeneration());
                 if (refusal != null) {
+                    refused.add(write.generation());
                     // The ledger refused this one row and rolled it back. That
                     // is not a broken writer: killing the thread here left the
                     // session unable to checkpoint, unable to resume and unable
@@ -228,13 +250,13 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
                     status.set(new Status(LoadState.READY, recovery, finalAccepted, durable,
                             "Automation persistence refused a write: "
                                     + refusal.getClass().getSimpleName() + ": " + refusal.getMessage(),
-                            Math.max(write.generation(), status.get().lastRefusedGeneration())));
+                            Math.max(write.generation(), status.get().lastRefusedGeneration()), refused));
                     continue;
                 }
                 durable = write.generation();
                 status.set(new Status(LoadState.READY, recovery,
                         finalAccepted, durable, "Checkpoint durable",
-                        status.get().lastRefusedGeneration()));
+                        write instanceof Resolve ? 0 : status.get().lastRefusedGeneration(), refused));
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -251,7 +273,7 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
                 status.set(new Status(LoadState.CLOSED, current.recovery(),
                         current.lastAcceptedGeneration(), current.lastDurableGeneration(),
                         "Automation persistence worker is closed",
-                        current.lastRefusedGeneration()));
+                        current.lastRefusedGeneration(), current.refusedGenerations()));
             }
         }
     }
@@ -260,7 +282,7 @@ public final class AutomationPersistenceWorker implements AutomationPersistenceP
                       long durable, String detail) {
         status.set(new Status(LoadState.FAILED, recovery,
                 Math.max(accepted, durable), durable, detail,
-                status.get().lastRefusedGeneration()));
+                status.get().lastRefusedGeneration(), status.get().refusedGenerations()));
     }
 
     private sealed interface Command permits QueuedWrite, Stop, FindCancelled {

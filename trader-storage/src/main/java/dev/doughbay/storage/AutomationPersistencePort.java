@@ -38,6 +38,19 @@ public interface AutomationPersistencePort extends AutoCloseable {
         return "";
     }
 
+    /** In-memory ports use process-unique IDs; the SQLite worker overrides this with durable leases. */
+    default long allocatePositionId() {
+        return InMemoryIds.NEXT.getAndIncrement();
+    }
+
+    default boolean positionIdsAvailable() { return true; }
+
+    final class InMemoryIds {
+        private InMemoryIds() { }
+        private static final java.util.concurrent.atomic.AtomicLong NEXT =
+                new java.util.concurrent.atomic.AtomicLong(1L << 49);
+    }
+
     enum LoadState { NOT_STARTED, LOADING, READY, FAILED, CLOSED }
 
     record Status(LoadState loadState,
@@ -45,16 +58,26 @@ public interface AutomationPersistencePort extends AutoCloseable {
                   long lastAcceptedGeneration,
                   long lastDurableGeneration,
                   String detail,
-                  long lastRefusedGeneration) {
+                  long lastRefusedGeneration,
+                  java.util.Set<Long> refusedGenerations) {
         public Status {
             loadState = loadState == null ? LoadState.FAILED : loadState;
             recovery = recovery == null ? AutomationSessionRecovery.empty() : recovery;
             detail = detail == null ? "" : detail;
             lastRefusedGeneration = Math.max(0, lastRefusedGeneration);
+            refusedGenerations = refusedGenerations == null ? java.util.Set.of() : java.util.Set.copyOf(refusedGenerations);
             if (lastAcceptedGeneration < 0 || lastDurableGeneration < 0
                     || lastDurableGeneration > lastAcceptedGeneration) {
                 throw new IllegalArgumentException("invalid persistence generations");
             }
+        }
+
+        public Status(LoadState loadState, AutomationSessionRecovery recovery,
+                      long lastAcceptedGeneration, long lastDurableGeneration,
+                      String detail, long lastRefusedGeneration) {
+            this(loadState, recovery, lastAcceptedGeneration, lastDurableGeneration, detail,
+                    lastRefusedGeneration, lastRefusedGeneration > 0
+                            ? java.util.Set.of(lastRefusedGeneration) : java.util.Set.of());
         }
 
         /** Source-compatible constructor for callers that report no refusal. */
@@ -71,7 +94,8 @@ public interface AutomationPersistencePort extends AutoCloseable {
         }
 
         public boolean durable(long generation) {
-            return generation > 0 && ready() && lastDurableGeneration >= generation;
+            return generation > 0 && ready() && lastDurableGeneration >= generation
+                    && !refusedGenerations.contains(generation);
         }
 
         /**
@@ -80,17 +104,15 @@ public interface AutomationPersistencePort extends AutoCloseable {
          * become durable, so a caller waiting on it must stop waiting.
          */
         public boolean refused(long generation) {
-            return generation > 0 && lastRefusedGeneration >= generation
-                    && lastDurableGeneration < generation;
+            return generation > 0 && refusedGenerations.contains(generation);
         }
 
         /**
-         * A refused write that no later write has superseded. Writes are
-         * applied in order, so a newer durable generation means the refusal is
-         * behind us.
+         * A refusal stays latched until explicit audited reconciliation or worker restart.
+         * An unrelated queued success cannot clear it.
          */
         public boolean refusalOutstanding() {
-            return lastRefusedGeneration > lastDurableGeneration;
+            return lastRefusedGeneration > 0;
         }
     }
 

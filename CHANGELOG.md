@@ -4,6 +4,9 @@ What each build changed, newest first. Times are UTC. The mod shows these in
 the update notice, after an update installs, and under What's new on the
 About tab.
 
+## 2026-10-15 21:57 UTC
+- Fixed: in a hive, each account now keeps its own auction and order slot counts — one account's 45 is no longer overwritten by another's 18 through the shared settings file. (#36)
+
 ## 2026-10-15 20:05 UTC
 
 - Added guided hive setup: create and copy a code in the account whose data you want to keep, paste and join in a second instance on the same PC, then restart each once. No junction commands, launcher changes or live database copies are needed. Existing history is never silently merged or overwritten; missing shared folders stop startup instead of creating an empty ledger.

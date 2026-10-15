@@ -1335,6 +1335,13 @@ public final class Tuning {
         // Consent can never be inherited from another client through shared tuning.json.
         LOCAL_KEYS.add("reports.auto_critical");
         VALUES.put("reports.auto_critical",0.0);
+        // What an account's rank grants it is its own whether or not its file
+        // names it yet. Left to the shared file, the last client to save gave
+        // every account of the hive its slot counts: one on 45 and one on 18
+        // ended up both on 18. The value already read from tuning.json stands
+        // until this client saves, so an install that only ever had the shared
+        // file keeps its number and writes it here the first time it changes.
+        LOCAL_KEYS.addAll(ACCOUNT_OWN);
         seenLocalModifiedAt = modifiedAt(local);
         if (local == null || !Files.exists(local)) return;
         try {
@@ -1373,6 +1380,13 @@ public final class Tuning {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("DoughBay");
     /** The settings whose value this client's own file gave, and so the ones saved back to it. */
     private static final java.util.Set<String> LOCAL_KEYS = ConcurrentHashMap.newKeySet();
+
+    /**
+     * The settings that belong to the account rather than to the setup: how
+     * many auction and order slots its rank grants it. Always this client's
+     * own, so two accounts sharing one tuning.json keep their own numbers.
+     */
+    static final java.util.Set<String> ACCOUNT_OWN = java.util.Set.of("slots.max", "orders.bid_slots");
 
     /**
      * Whether a setting is this client's own: its value comes from

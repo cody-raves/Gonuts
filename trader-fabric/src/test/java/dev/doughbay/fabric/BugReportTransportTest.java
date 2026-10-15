@@ -23,22 +23,13 @@ class BugReportTransportTest {
         assertEquals("UNKNOWN", fromChat.get("state"));
         assertEquals(0L, fromChat.get("sqlite_errors"));
     }
-    @Test void wrongOriginNeverAuthorizesCredentialSharing() {
-        assertFalse(BugReportTransport.mayUseToken("https://api.donutsmp.net", "secret"));
-        assertFalse(BugReportTransport.mayUseToken("https://gonuts.at.attacker.net", "secret"));
-        assertFalse(BugReportTransport.mayUseToken("https://user@gonuts.at", "secret"));
-        assertFalse(BugReportTransport.mayUseToken("https://gonuts.at", ""));
-        assertFalse(BugReportTransport.mayUseToken("https://gonuts.at", "secret\r\nheader"));
-        assertTrue(BugReportTransport.mayUseToken("https://gonuts.at", "install-secret"));
-        assertTrue(BugReportTransport.mayUseToken("http://gonuts.at", "install-secret"));
-        var blocked = new BugReportTransport().send(payload(), "retry-key-123", "https://api.donutsmp.net", "official-key").join();
-        assertFalse(blocked.filed()); assertFalse(blocked.message().contains("official-key"));
-    }
     @Test void httpsFixedDestinationAndRetryKeyRemainStable() {
         var a = BugReportTransport.request(payload(), "01234567-1234-1234-1234-012345678901", "test-install");
         var b = BugReportTransport.request(payload(), "01234567-1234-1234-1234-012345678901", "test-install");
         assertEquals("https://gonuts.at/v1/bugs", a.uri().toString());
         assertEquals(a.headers().firstValue("Idempotency-Key"), b.headers().firstValue("Idempotency-Key"));
+        assertTrue(a.headers().firstValue("Authorization").isEmpty());
+        assertEquals(a.uri(), BugReportTransport.request(payload(), "retry-key-123", "").uri());
         assertThrows(IllegalArgumentException.class, () -> BugReportTransport.request(payload(), "bad", "test"));
     }
     @Test void successAndDuplicateReturnOnlyTrustedIssueLinks() {
@@ -54,7 +45,8 @@ class BugReportTransportTest {
         assertEquals(3601000, BugReportTransport.interpret(429, "", "invalid", 1000).retryAtMillis());
         assertEquals(61000, BugReportTransport.interpret(503, "private", "", 1000).retryAtMillis());
         assertTrue(BugReportTransport.interpret(503, "", "", 0).message().contains("temporarily"));
-        assertTrue(BugReportTransport.interpret(401, "", "", 0).message().contains("token"));
+        assertFalse(BugReportTransport.interpret(401, "", "", 0).message().contains("token"));
+        assertTrue(BugReportTransport.interpret(409, "private", "", 0).message().contains("Prepare again"));
     }
     @Test void schemaRejectsRawLogsUnknownFieldsAndNonIntegerCounters() {
         assertThrows(IllegalArgumentException.class, () -> new BugReportPayload("0.1.0", "26.2", "short", "yes", payload().diagnostics()));
@@ -83,14 +75,5 @@ class BugReportTransportTest {
         assertFalse(BugReportTransport.advertisesLogSupport(json.readTree(capabilities.replace("8192","4096"))));
         assertFalse(BugReportTransport.advertisesLogSupport(json.readTree(capabilities.replace("[1,2]","[1]"))));
         assertFalse(BugReportTransport.advertisesLogSupport(json.readTree("{}")));
-        assertFalse(new BugReportTransport().supportsLogAttachments("https://api.donutsmp.net", "official-key").join());
-    }
-    @Test void legacyNumericOriginsMustMatchTheTrustedDomainsResolvedAddress() {
-        var addresses = java.util.List.of("192.0.2.10");
-        assertTrue(BugReportTransport.matchesResolvedOrigin("http://192.0.2.10", addresses));
-        assertFalse(BugReportTransport.matchesResolvedOrigin("http://192.0.2.20", addresses));
-        assertFalse(BugReportTransport.matchesResolvedOrigin("http://192.0.2.10:8123", addresses));
-        assertFalse(BugReportTransport.matchesResolvedOrigin("http://user@192.0.2.10", addresses));
-        assertFalse(BugReportTransport.matchesResolvedOrigin("http://192.0.2.10?secret=1", addresses));
     }
 }

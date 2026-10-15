@@ -1179,6 +1179,8 @@ public class DoughBayClient implements ClientModInitializer {
         return RIVALS;
     }
 
+    public static void yieldRestartToStaffWatch() { RESTART.yieldToStaffWatch(); }
+
     public static AutomationSessionController automationSessionController() {
         return AUTOMATION_SESSION;
     }

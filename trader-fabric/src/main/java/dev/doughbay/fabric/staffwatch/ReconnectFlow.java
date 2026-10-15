@@ -26,6 +26,15 @@ public final class ReconnectFlow {
   client.disconnect(schedule.watcher());
   return true;
  }
+ /** Retains the staff delay even when a region transfer itself lost the connection. */
+ public boolean staffCooldown(String name, String configured, boolean enabled) {
+  if(client.connected())return alert(name,configured,enabled);
+  if(!enabled||schedule.active())return false;
+  String address=destination(configured,sessionAddress==null?client.currentAddress():sessionAddress);
+  if(address==null||address.isBlank())return false;
+  sessionAddress=address;schedule.begin(address,name==null?"Staff":name);phase=Phase.DISCONNECTING;
+  return true;
+ }
  /** Records manual attempts, including connections that never reach a world. */
  public void connectionStarted(String address, boolean enabled) {
   cancel();

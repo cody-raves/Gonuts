@@ -1,13 +1,15 @@
 # Bug reports and VPS handoff
 
-The client now sends reviewed reports directly to **https://gonuts.at/v1/bugs**
-using the configured gonuts.at install token. It never reuses an official DonutSMP
-key or a token configured for another server. A legacy numeric origin is accepted only after an off-thread DNS check confirms it matches gonuts.at, with standard ports and no credential-bearing URL. No IP is baked into the JAR. Unrelated custom proxies retain the GitHub fallback. Transport always uses HTTPS,
+The client sends reviewed reports directly to **https://gonuts.at/v1/bugs**
+without an API token, signup, Discord membership or GitHub account. Market-feed
+credentials and custom market URLs do not affect reporting. Neither the report
+nor its capabilities request sends an Authorization header. No IP or shared
+secret is baked into the JAR. Transport always uses HTTPS,
 never follows redirects, bounds reply sizes and times out failed requests.
 
 In **About → Report bug**, enter a description and expected behavior, choose
 **Prepare**, scroll through the filtered preview, confirm **I reviewed this public
-report**, then **Send reviewed**. Authentication-free GitHub submission remains a
+report**, then **Send reviewed**. Manual GitHub submission remains a
 fallback (GitHub sign-in required). No report is sent in the background.
 
 Success and duplicate replies offer **Open issue**. Retrying an unchanged report
@@ -16,6 +18,8 @@ GitHub/receiver availability holds it briefly. There is no automatic retry loop.
 Report preparation failure disables sending and never falls back to raw logs.
 A 503 means reporting is temporarily unavailable, not that the report was filed.
 The VPS operator must install its GitHub Issues token before filing can succeed.
+That credential stays on the VPS. A 409 means prepare a new report/retry identifier;
+neither copying text nor opening the GitHub fallback counts as a submitted report.
 
 **Feature request** opens a separate GitHub form, without diagnostics; requests
 are considered, not guaranteed. It is not a bug-report receiver submission.
@@ -42,8 +46,8 @@ and five integer counters. UNKNOWN is uppercase. The mod build timestamp is
 appended to its version when it fits the receiver's 40-character build limit,
 so reports distinguish releases sharing the same mod version and JAR filename.
 
-Schema 2 adds an optional filtered log excerpt. The client authenticates the
-capabilities check with the install token and verifies advertised sizes/line limits
+Schema 2 adds an optional filtered log excerpt. The client checks public
+capabilities without a credential and verifies advertised sizes/line limits
 before enabling **Include log** (On by default when supported). Older receivers
 and unavailable capabilities retain schema 1 reporting with no attachment.
 The attachment choice is reflected in the local preview before explicit consent;

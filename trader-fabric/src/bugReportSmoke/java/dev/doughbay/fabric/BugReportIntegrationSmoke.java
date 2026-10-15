@@ -45,12 +45,13 @@ public final class BugReportIntegrationSmoke implements ClientModInitializer {
                 case 0 -> {
                     if (ticks < 70) return;
                     check(mc.level == null, "Test is offline, not joined to a server");
+                    check(DoughBayClient.activeConfig().apiKey().isBlank(), "Install has no API token configured");
                     mc.options.pauseOnLostFocus = false; mc.options.guiScale().set(2); mc.resizeGui();
                     screen = new BugReportScreen(mc.gui.screen()); mc.gui.setScreen(screen); next();
                 }
                 case 1 -> {
                     if (ticks < 60) return;
-                    ((EditBox) field("happened")).setValue("GoNuts GUI integration smoke test: local privacy filtering and explicit consent. Test data: test@example.invalid https://example.invalid/private 192.0.2.1 token=test-only");
+                    ((EditBox) field("happened")).setValue("[test] Please close: public GoNuts GUI smoke test: local privacy filtering and explicit consent. Test data: test@example.invalid https://example.invalid/private 192.0.2.1 token=test-only");
                     ((EditBox) field("expected")).setValue("One public test issue, with private examples removed and a duplicate retry returning the same issue.");
                     press("Prepare"); next();
                 }
@@ -58,13 +59,13 @@ public final class BugReportIntegrationSmoke implements ClientModInitializer {
                     if (ticks < 30 || (boolean) field("collecting")) return;
                     var payload = (BugReportPayload) field("payload");
                     check(payload != null, "Prepared valid receiver payload from GUI");
-                    check((boolean)field("attachmentReady") && !((String)field("diagnosticLog")).isEmpty(), "Authenticated capabilities enable a locally filtered log attachment");
+                    check((boolean)field("attachmentReady") && !((String)field("diagnosticLog")).isEmpty(), "Public capabilities enable a locally filtered log attachment");
                     for (String secret : List.of("test@example", "example.invalid", "192.0.2.1", "test-only"))
                         check(!payload.description().contains(secret), "Private sample removed: " + secret);
                     check(!button("Send reviewed").active, "Submission disabled before explicit public-report consent");
                     capture(mc, "bug-report-preview.png");
                     press("I reviewed this public report");
-                    check(button("Send reviewed").active, "Reviewed report can be submitted with install authentication");
+                    check(button("Send reviewed").active, "Reviewed report can be submitted without authentication");
                     press("Send reviewed"); next();
                 }
                 case 3 -> {
@@ -74,7 +75,7 @@ public final class BugReportIntegrationSmoke implements ClientModInitializer {
                     check(button("Open issue").active, "GUI offers the accepted issue link");
                     check(!button("Send reviewed").active, "Accepted report cannot be accidentally resubmitted");
                     var config = DoughBayClient.activeConfig();
-                    duplicate = new BugReportTransport().send((BugReportPayload) field("payload"), (String) field("retryKey"), config.apiBaseUrl(), config.apiKey(), (String)field("diagnosticLog"));
+                    duplicate = new BugReportTransport().send((BugReportPayload) field("payload"), (String) field("retryKey"), "", "", (String)field("diagnosticLog"));
                     next();
                 }
                 case 4 -> {

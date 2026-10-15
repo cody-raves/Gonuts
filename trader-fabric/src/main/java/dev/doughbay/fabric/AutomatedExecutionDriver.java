@@ -4363,13 +4363,18 @@ public final class AutomatedExecutionDriver implements ExecutionDriver {
      */
     /** When the last /rtp or /home actually left the client; 0 before any did. */
     private volatile long lastEscapeSentAt;
+    private volatile String lastEscapeCommand = "";
+    public String lastEscapeCommand() { return lastEscapeCommand; }
 
     public long lastEscapeSentAt() {
         return lastEscapeSentAt;
     }
 
     private void noteEscapeSent(String command, long now) {
-        if (command.equals("rtp") || command.startsWith("home ")) lastEscapeSentAt = now;
+        if (command.equals("rtp") || command.startsWith("rtp ") || command.startsWith("home ")) {
+            lastEscapeCommand = command;
+            lastEscapeSentAt = now;
+        }
     }
 
     public synchronized void sendWhenClear(Minecraft client, String command) {

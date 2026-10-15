@@ -30,7 +30,7 @@ public final class BugReportScreen extends Screen {
         if (!capabilityChecked) {
             capabilityChecked = true;
             var config = DoughBayClient.activeConfig();
-            transport.supportsLogAttachments(config == null ? "" : config.apiBaseUrl(), config == null ? "" : config.apiKey()).thenAccept(ready -> minecraft.execute(() -> {
+            transport.supportsLogAttachments("", "").thenAccept(ready -> minecraft.execute(() -> {
                 attachmentReady = ready;
                 capabilityResolved = true;
                 if (minecraft.gui.screen() == this) rebuildWidgets();
@@ -77,7 +77,7 @@ public final class BugReportScreen extends Screen {
     private void refreshSend() {
         var config = DoughBayClient.activeConfig();
         sendButton.active = payload != null && reviewed && !collecting && !sending && issueUrl.isEmpty()
-            && System.currentTimeMillis() >= retryAt && config != null && BugReportTransport.mayUseToken(config.apiBaseUrl(), config.apiKey());
+            && System.currentTimeMillis() >= retryAt;
     }
     private void invalidate() {
         payload = null; report = ""; reviewed = false; retryKey = ""; issueUrl = ""; scroll = 0; diagnosticLog = "";
@@ -113,18 +113,16 @@ public final class BugReportScreen extends Screen {
             report = result == null ? "" : payload.preview() + (diagnosticLog.isEmpty() ? "" : "\n\nAttached filtered log:\n" + diagnosticLog);
             var config = DoughBayClient.activeConfig();
             status = result == null ? "Preparation failed. Describe the problem (10+ characters); no raw-log fallback."
-                : config == null || !BugReportTransport.mayUseToken(config.apiBaseUrl(), config.apiKey())
-                    ? "Direct reporting needs a gonuts.at install token. GitHub fallback is available."
-                    : "Review the full report below (scroll), then confirm it may be published.";
+                : "Review the full report below (scroll), then confirm it may be published.";
             if (minecraft.gui.screen() == this) rebuildWidgets();
         }));
     }
     private void send() {
         var config = DoughBayClient.activeConfig();
-        if (payload == null || !reviewed || collecting || sending || !issueUrl.isEmpty() || System.currentTimeMillis() < retryAt || config == null) return;
+        if (payload == null || !reviewed || collecting || sending || !issueUrl.isEmpty() || System.currentTimeMillis() < retryAt) return;
         if (retryKey.isEmpty()) retryKey = java.util.UUID.randomUUID().toString();
         sending = true; status = "Sending reviewed report over HTTPS…"; rebuildWidgets();
-        transport.send(payload, retryKey, config.apiBaseUrl(), config.apiKey(), diagnosticLog).thenAccept(result -> minecraft.execute(() -> {
+        transport.send(payload, retryKey, "", "", diagnosticLog).thenAccept(result -> minecraft.execute(() -> {
             sending = false; status = result.message(); issueUrl = result.issueUrl(); retryAt = result.retryAtMillis();
             if (minecraft.gui.screen() == this) rebuildWidgets();
         }));

@@ -100,8 +100,7 @@ public final class AntiVanishModule extends ClientModule {
    private final Map<String, AntiVanishModule.HiddenSpell> hiddenSpells = new LinkedHashMap<>();
    private final Deque<AntiVanishModule.RecentMessage> recentMessages = new ArrayDeque<>();
    private boolean serverSendsLeaveMessages;
-   private final Set<Integer> completionRequestIds = ConcurrentHashMap.newKeySet();
-   private volatile List<String> pendingCompletionNames;
+   private final dev.doughbay.fabric.staffwatch.LocalCompletionInbox completionInbox = new dev.doughbay.fabric.staffwatch.LocalCompletionInbox();
    private int nextCompletionId = 30000;
    private static final long RECENT_MESSAGE_TTL_MS = 8000L;
    private static final long TRUSTED_LISTED_MS = 1500L;
@@ -274,7 +273,7 @@ public final class AntiVanishModule extends ClientModule {
             this.observations.offer(AntiVanishModule.Observation.playerLeft(departedName));
          }
       } else {
-         if (packet instanceof ClientboundCommandSuggestionsPacket suggestions && this.completionRequestIds.remove(suggestions.id())) {
+         if (packet instanceof ClientboundCommandSuggestionsPacket suggestions) {
             List<String> names = new ArrayList<>();
 
             for (Suggestion suggestion : suggestions.toSuggestions().getList()) {
@@ -284,8 +283,7 @@ public final class AntiVanishModule extends ClientModule {
                }
             }
 
-            this.pendingCompletionNames = names;
-            return true;
+            return this.completionInbox.complete(suggestions.id(), names);
          }
 
          if (packet instanceof ClientboundSetEntityDataPacket metadata) {
@@ -636,11 +634,7 @@ public final class AntiVanishModule extends ClientModule {
             this.nextCompletionId = 30000;
          }
 
-         this.completionRequestIds.add(id);
-
-         while (this.completionRequestIds.size() > 8) {
-            this.completionRequestIds.remove(this.completionRequestIds.iterator().next());
-         }
+         this.completionInbox.register(id);
 
          try {
             MC.getConnection().send(new ServerboundCommandSuggestionPacket(id, command.trim() + " "));
@@ -650,9 +644,8 @@ public final class AntiVanishModule extends ClientModule {
    }
 
    private void processCompletionProbe() {
-      List<String> current = this.pendingCompletionNames;
+      List<String> current = this.completionInbox.take();
       if (current != null) {
-         this.pendingCompletionNames = null;
          if (MC.getConnection() != null && MC.player != null) {
             Set<String> tabNames = new HashSet<>();
 
@@ -678,6 +671,9 @@ public final class AntiVanishModule extends ClientModule {
             if (!hidden.isEmpty() && hidden.size() <= 3) {
                for (String namex : hidden) {
                   this.reportHidden(this.knownUuid(namex), namex, false, "Vanish Event: hidden but targetable", "off TAB, still targetable", 90);
+                  // This exact vanilla completion probe was measured as shard-local.
+                  // A hidden name need not have a UUID in the current player list.
+                  dev.doughbay.fabric.staffwatch.ReconnectController.INSTANCE.alert(namex);
                }
             }
          }
@@ -1281,10 +1277,10 @@ public final class AntiVanishModule extends ClientModule {
       this.recentMessages.clear();
       this.listedSinceMs.clear();
       this.serverSendsLeaveMessages = false;
-      this.completionRequestIds.clear();
-      this.pendingCompletionNames = null;
-      this.nextCompletionId = 30000;
+      this.completionInbox.reset();
    }
+
+   public void resetForRegionTransfer() { this.resetRuntime(); }
 
    @Environment(EnvType.CLIENT)
    private static final class Detection {

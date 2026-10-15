@@ -356,6 +356,18 @@ public final class AutomationSessionController {
         return persistence.status().durable(persistence.status().lastAcceptedGeneration());
     }
 
+    private boolean staffTransferHold;
+
+    /** A connection escape owns this hold, independently of the player's pause choice. */
+    public synchronized void holdForStaffTransfer(boolean hold) { staffTransferHold = hold; }
+
+    public synchronized ExecutionResult resumeAfterStaffTransfer() {
+        if (pausedByPlayer || state != State.PAUSED || !detail.startsWith("PAUSED: Staff Watch:")
+                && !detail.startsWith("Staff Watch:"))
+            return ExecutionResult.refused("Staff Watch did not own this pause; preserving the user's or recovery pause");
+        return resume();
+    }
+
     public boolean quietMarket() {
         return quietMarket;
     }
@@ -1836,6 +1848,7 @@ public final class AutomationSessionController {
 
     /** Only an unambiguous scan or already-listed position can be resumed. */
     public synchronized ExecutionResult resume() {
+        if (staffTransferHold) return ExecutionResult.refused("Staff Watch region transfer is in progress");
         if (state != State.PAUSED) {
             return ExecutionResult.refused("Only a paused session can be resumed");
         }
@@ -1918,6 +1931,7 @@ public final class AutomationSessionController {
     /** Continues an open recovered session without resetting its durable caps. */
     public synchronized ExecutionResult resumeRecoveredSession(
             ContinuousAutomationPolicy requestedPolicy) {
+        if (staffTransferHold) return ExecutionResult.refused("Staff Watch region transfer is in progress");
         if (!recoveryApplied || !recoveredSession || !sessionOpen
                 || state != State.PAUSED) {
             return ExecutionResult.refused("No exposure-free recovered session is available");
@@ -2240,6 +2254,11 @@ public final class AutomationSessionController {
         if (marketSnapshot != null && marketSnapshot.accountBalance() > 0) {
             lastKnownBalance = marketSnapshot.accountBalance();
             dev.doughbay.fabric.DoughBayClient.noteBalanceForHive(lastKnownBalance);
+        }
+        if (staffTransferHold) {
+            synchronizePersistenceRecovery();
+            processOutOfBandPersistence();
+            return;
         }
         autoReleaseUnclickedRecoveredIntent(client);
         autoResumeInternalPause(client, System.currentTimeMillis());
@@ -12561,6 +12580,7 @@ public final class AutomationSessionController {
     }
 
     private String authorizationBlocker(Minecraft client) {
+        if (staffTransferHold) return "Staff Watch region transfer is in progress";
         if (!continuousAuthorizationEnabled) {
             return "Continuous automation is disabled in config";
         }

@@ -151,6 +151,8 @@ public final class StaffListModule extends ClientModule {
       this.forgetShard();
    }
 
+   public void resetForRegionTransfer() { this.forgetShard(); this.shard.clear(); }
+
    private void forgetShard() {
       this.switches.clear();
       this.sightings.clear();

@@ -4,6 +4,12 @@ What each build changed, newest first. Times are UTC. The mod shows these in
 the update notice, after an update installs, and under What's new on the
 About tab.
 
+## 2026-10-15 00:08 UTC
+
+- Bug reports now send directly without obtaining an API token. Public capabilities enable the sanitized log excerpt, and the GUI shows Sent only after a valid issue link. Retries keep their identifier; a 409 conflict asks the user to prepare again.
+- Staff Watch now queues a safe regional RTP on the first qualifying alert. A fresh sighting of the same staff after confirmed arrival triggers another hop, then the existing five-to-ten-minute disconnect cooldown. Late autocomplete replies and duplicate alerts cannot escalate a transfer.
+- Transfer commands respect the teleport safety setting and durable transaction boundaries. Blocked, failed or unconfirmed hops fall back to disconnecting. Manual stops/pauses and recovery locks are preserved; coordinate labels are not accepted as transfer proof.
+
 ## 2026-10-14 21:55 UTC
 - Fixed: with two clients sharing one ledger, retail singles could be prepared with a position id the other client had already used, which refused the save ("Retail child position id is already in use"), stopped all further record-keeping and left the bid desk pausing and auto-resuming for hours without being able to stop; position ID ranges are now reserved durably by the shared ledger, and rejected writes stay rejected even after later saves. The writer remains available for safe stop/reconciliation; automatic retries retain exposure and pause until explicit reconciliation or restart. Existing transaction history is preserved. (#5)
 

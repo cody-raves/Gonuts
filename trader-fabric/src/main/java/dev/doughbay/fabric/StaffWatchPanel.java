@@ -23,7 +23,7 @@ final class StaffWatchPanel {
   var c=WatchConfig.get();
   int col=(w-24)/2;
   toggle(add,"Module",()->c.enabled,v->c.enabled=v,x+8,40,col);
-  toggle(add,"Disconnect / reconnect",()->c.autoDisconnect,v->c.autoDisconnect=v,x+16+col,40,col);
+  toggle(add,"Escape / reconnect",()->c.autoDisconnect,v->c.autoDisconnect=v,x+16+col,40,col);
   toggle(add,"Staff List",()->c.staffList,v->c.staffList=v,x+8,66,col);
   toggle(add,"Anti Vanish",()->c.antiVanish,v->c.antiVanish=v,x+16+col,66,col);
   toggle(add,"Region alerts",()->c.regionAlert,v->c.regionAlert=v,x+8,92,col);
@@ -48,7 +48,7 @@ final class StaffWatchPanel {
   text(g,font,"STAFF WATCH",x+10,y+10,UiTheme.GOLD);
   text(g,font,"Donut SMP staff panels at top center; warnings appear below.",x+10,y+25,UiTheme.SECONDARY);
   text(g,font,"DONUT SMP — click to choose Main / East / West",x+10,y+148,UiTheme.TEXT);
-  text(g,font,"Staff: leave immediately, wait 5–10 min. Other errors: retry every 2 min.",x+10,y+190,UiTheme.MUTED);
+  text(g,font,"Staff: change region; repeat sighting: hop, leave, wait 5–10 min.",x+10,y+190,UiTheme.MUTED);
   text(g,font,message,x+10,y+204,error?UiTheme.BAD:UiTheme.GOOD);
   UiTheme.panel(g,x,y+226,w,76,UiTheme.INSET);
   text(g,font,c.enabled?"MONITORING ENABLED":"MODULE DISABLED",x+10,y+237,c.enabled?UiTheme.GOOD:UiTheme.MUTED);

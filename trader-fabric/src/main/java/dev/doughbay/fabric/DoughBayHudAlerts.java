@@ -40,6 +40,7 @@ final class DoughBayHudAlerts {
         // count drift, in a form you could watch.
         LISTING(0xFF6FB8FF, 0xFF2A6FB8),
         ORDER(0xFFC08CFF, 0xFF6D3FB8),
+        INFO(0xFF9EB6C9, 0xFF52697D),
         WARNING(0xFFFFA45B, 0xFFB85F23),
         ERROR(0xFFFF6F70, 0xFFB6343E);
 
@@ -366,7 +367,16 @@ final class DoughBayHudAlerts {
         if (signature.equals(lastDriverStatus)) return;
         lastDriverStatus = signature;
 
-        if (status.state() == ExecutionStatus.State.ABORTED) {
+        if (status.state() == ExecutionStatus.State.ABORTED
+                && status.description() != null
+                && status.description().startsWith("Auction watch yielded after ")
+                && status.description().endsWith("seconds to check orders and existing stock; nothing was charged")) {
+            // This unclicked watch ends normally so the trading loop can service
+            // orders and stock. Keep genuine aborts on the error path below.
+            add(new Alert(Type.INFO, "AUCTION WATCH FINISHED",
+                    "Checking orders and existing stock", "No purchase made; continuing trading", "",
+                    now, 5_000L));
+        } else if (status.state() == ExecutionStatus.State.ABORTED) {
             add(new Alert(Type.ERROR, "EXECUTION ABORTED",
                     status.description(), "No further action was sent", "",
                     now, 8_000L));

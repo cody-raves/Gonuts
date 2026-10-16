@@ -4,6 +4,10 @@ What each build changed, newest first. Times are UTC. The mod shows these in
 the update notice, after an update installs, and under What's new on the
 About tab.
 
+## 2026-10-16 23:00 UTC
+
+- Routine auction-watch handoffs now show a neutral "Auction watch finished" notice instead of a red "Execution aborted" warning. The notice explains that no purchase was made and trading continues with orders and existing stock. Actual execution failures still show red error alerts.
+
 ## 2026-10-16 20:49 UTC
 
 - Bug reports now include a sanitized Settings code alongside the diagnostic log. It contains approved numeric settings and toggles, including account slot limits, so support can distinguish configuration problems from defects. Home names, player lists, webhooks, Discord identifiers, tokens and all other text settings are excluded. The preview shows the attached code, and retries retain the prepared snapshot.

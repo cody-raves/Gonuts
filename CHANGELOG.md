@@ -4,6 +4,12 @@ What each build changed, newest first. Times are UTC. The mod shows these in
 the update notice, after an update installs, and under What's new on the
 About tab.
 
+## 2026-10-16 23:42 UTC
+
+- Added named saved presets in Settings: save the current setup, apply an existing copy, rename, copy its Settings code, or explicitly replace/delete it. Saved copies remain independent and survive restarts; empty item lists restore correctly, while account slot counts and follow settings keep their existing import protections.
+- Added a local Analyzer tab in the GUI and web panel. It reviews the 24-hour ledger, bankroll, purchase limits, active hive client count, this account's slot capacity and recorded uptime, plus observed opportunities and follow notices. Findings separate measured performance from conditional estimates and can be saved as a suggested preset without applying changes.
+- Analysis runs locally, dispatches no trades and sends no analytics or settings to a backend. Market suggestions require fresh non-demo observations and sufficient sales evidence. Historical results are not attributed to the current configuration.
+
 ## 2026-10-16 23:00 UTC
 
 - Routine auction-watch handoffs now show a neutral "Auction watch finished" notice instead of a red "Execution aborted" warning. The notice explains that no purchase was made and trading continues with orders and existing stock. Actual execution failures still show red error alerts.

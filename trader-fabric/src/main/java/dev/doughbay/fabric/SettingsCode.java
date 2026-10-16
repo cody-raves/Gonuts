@@ -71,19 +71,28 @@ public final class SettingsCode {
 
     /** Packs the current tuning into a shareable code. */
     public static String export() {
+        return exportPreset(Map.of(), Map.of(), false);
+    }
+
+    /** A complete shareable snapshot, including empty item lists for reliable rollback. */
+    static String exportPreset(Map<String, Double> changes, Map<String, String> lists) {
+        return exportPreset(changes, lists, true);
+    }
+
+    private static String exportPreset(Map<String, Double> changes, Map<String, String> lists, boolean emptyLists) {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode root = mapper.createObjectNode();
         root.put("v", VERSION);
         ObjectNode numbers = root.putObject("n");
         for (Tuning.Setting s : Tuning.SETTINGS) {
             if (staysBehind(s.key())) continue;
-            numbers.put(s.key(), Tuning.get(s.key()));
+            numbers.put(s.key(), s.clamp(changes.getOrDefault(s.key(), Tuning.get(s.key()))));
         }
         ObjectNode texts = root.putObject("t");
         for (Tuning.ListSetting l : Tuning.LISTS) {
             if (NEVER_EXPORT.contains(l.key())) continue;
-            String value = Tuning.text(l.key());
-            if (!value.isBlank()) texts.put(l.key(), value);
+            String value = lists.getOrDefault(l.key(), Tuning.text(l.key()));
+            if (emptyLists || !value.isBlank()) texts.put(l.key(), value);
         }
         try {
             return encode(mapper.writeValueAsBytes(root));

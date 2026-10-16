@@ -47,6 +47,8 @@ public final class DoughBayScreen extends Screen {
     private final ProxyPanel proxyPanel = new ProxyPanel();
     private final HivePanel hivePanel = new HivePanel();
 
+    private final AnalyzerPanel analyzerPanel = new AnalyzerPanel();
+
     private enum Tab {
         OVERVIEW("Dashboard"),
         OPPORTUNITIES("Opportunities"),
@@ -55,6 +57,7 @@ public final class DoughBayScreen extends Screen {
         ITEMS("Items"),
         FLIPS("Flips"),
         STATS("Performance"),
+        ANALYZER("Analyzer"),
         RIVALS("Rivals"),
         ORDERS("Orders"),
         AUTOMATION("Autopilot"),
@@ -824,6 +827,8 @@ public final class DoughBayScreen extends Screen {
             proxyPanel.init(font,ui.innerLeft(),ui.contentTop(),ui.innerWidth(),this::addRenderableWidget,this::rebuildWidgets);
         } else if (tab == Tab.HIVE) {
             hivePanel.init(font,ui.innerLeft(),ui.contentTop(),ui.innerWidth(),ui.bottom()-16,this::addRenderableWidget,this::rebuildWidgets);
+        } else if (tab == Tab.ANALYZER) {
+            analyzerPanel.init(ui.innerLeft(),ui.contentTop(),ui.innerWidth(),ui.bottom()-16,this::addRenderableWidget,this::rebuildWidgets,this);
         } else if (tab == Tab.STATS) {
             initStatsWidgets(ui);
         } else if (tab == Tab.MARKETS) {
@@ -986,6 +991,7 @@ public final class DoughBayScreen extends Screen {
             case ITEMS -> renderItems(graphics, ui, mouseX, mouseY);
             case FLIPS -> renderFlips(graphics, ui, mouseX, mouseY);
             case STATS -> renderStats(graphics, current, ui, mouseX, mouseY);
+            case ANALYZER -> analyzerPanel.render(graphics, font);
             case RIVALS -> renderRivals(graphics, ui, mouseX, mouseY);
             case SETTINGS -> renderSettings(graphics, ui, mouseX, mouseY);
             case EVASION -> renderSettings(graphics, ui, mouseX, mouseY);
@@ -3008,12 +3014,15 @@ public final class DoughBayScreen extends Screen {
             if (tab == Tab.EVASION) return;
             int by = ui.bottom() - 27;
             int bx = ui.innerLeft();
-            int w1 = 156;
-            int w2 = 172;
-            addRenderableWidget(CockpitButton.builder(Component.literal("Copy settings code"),
+            int w1 = Math.min(156,(ui.innerWidth()-12)/3);
+            int w2 = Math.min(172,(ui.innerWidth()-12)/3);
+            addRenderableWidget(CockpitButton.builder(Component.literal(ui.innerWidth()<470?"Copy code":"Copy settings code"),
                     ignored -> exportSettingsCode()).bounds(bx, by, w1, 20).build());
-            addRenderableWidget(CockpitButton.builder(Component.literal("Import from clipboard"),
+            addRenderableWidget(CockpitButton.builder(Component.literal(ui.innerWidth()<470?"Import code":"Import from clipboard"),
                     ignored -> importSettingsCode()).bounds(bx + w1 + 6, by, w2, 20).build());
+            addRenderableWidget(CockpitButton.builder(Component.literal("Saved presets"),
+                    ignored -> Minecraft.getInstance().gui.setScreen(new PresetsScreen(this)))
+                    .bounds(bx + w1 + w2 + 12, by, Math.min(116,ui.innerWidth()-w1-w2-12), 20).build());
             return;
         }
         boolean list = isListSetting(selectedSetting);
@@ -6647,6 +6656,7 @@ public final class DoughBayScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        if(tab==Tab.ANALYZER&&analyzerPanel.scroll(mouseX,mouseY,deltaY))return true;
         if(tab==Tab.APPEARANCE&&appearancePanel.scroll(mouseX,mouseY,deltaY))return true;
         if(tab==Tab.STAFF_WATCH&&staffWatchPanel.scroll(mouseX,mouseY,deltaY))return true;
         AUTOMATION_SESSION.notePanelActivity();
@@ -6758,8 +6768,8 @@ public final class DoughBayScreen extends Screen {
         int left = (this.width - panelWidth) / 2;
         int top = (this.height - panelHeight) / 2;
         int inset = panelWidth >= 700 ? 16 : 9;
-        // Seventeen entries down the side, and the line under them.
-        int sidebar = panelWidth >= 680 && panelHeight >= Math.max(499, 120 + Tab.values().length * 21) ? 144 : 0;
+        // Fit the actual last sidebar button plus its group spacing and bottom margin.
+        int sidebar = panelWidth >= 680 && panelHeight >= Math.max(499, 126 + (Tab.values().length - 1) * 21) ? 144 : 0;
         int columns = Math.max(3, Math.min(7, (panelWidth - inset * 2) / 90));
         int rows = (Tab.values().length + columns - 1) / columns;
         int headerHeight = sidebar > 0 ? 64 : 58 + rows * 22;

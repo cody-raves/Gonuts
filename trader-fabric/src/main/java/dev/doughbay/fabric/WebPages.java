@@ -54,6 +54,8 @@ public final class WebPages {
     public static String data(String name, Map<String, String> query) {
         return switch (name == null ? "" : name) {
             case "settings" -> settings();
+            case "savedpresets" -> savedPresetsData();
+            case "analyzer" -> analyzerData();
             case "evasion" -> evasion();
             case "code" -> answer(true, "").put("code", SettingsCode.export()).toString();
             case "items" -> items();
@@ -79,6 +81,8 @@ public final class WebPages {
             case "regions" -> onClient(() -> changeRegion(form));
             case "list" -> onClient(() -> list(form));
             case "preset" -> onClient(() -> preset(form.get("name")));
+            case "savedpresets" -> onClient(() -> savedPresetsChange(form));
+            case "analyzer" -> onClient(() -> { SettingsAnalyzer.refresh(); return answer(true,"Analysis started; settings unchanged").toString(); });
             case "code" -> onClient(() -> importCode(form.get("code")));
             case "items" -> onClient(() -> itemsChange(form.get("ids"), form.get("do")));
             case "rival" -> onClient(() -> rivalMarkets(snapshot(), unhex(form.get("id")), form.get("do")));
@@ -394,6 +398,35 @@ public final class WebPages {
             return answer(true, note).toString();
         }
         return answer(true, found.label() + (text.isEmpty() ? " cleared" : " saved")).toString();
+    }
+
+    private static String savedPresetsData() {
+        var out=answer(true, "");
+        try { out.set("presets",MAPPER.valueToTree(SavedPresets.current().entries())); }
+        catch(Exception e){ return answer(false,"Saved presets could not be read; existing file kept").toString(); }
+        return out.toString();
+    }
+    private static String analyzerData() {
+        var out=answer(true,SettingsAnalyzer.status());
+        out.set("report",MAPPER.valueToTree(SettingsAnalyzer.report()));return out.toString();
+    }
+    private static String savedPresetsChange(Map<String,String> form) {
+        try {
+            var store=SavedPresets.current(); String id=form.getOrDefault("id",""),action=form.getOrDefault("action","");
+            switch(action){
+                case "save", "replace" -> {
+                    String code;
+                    if("proposal".equals(form.get("source"))){var report=SettingsAnalyzer.report();if(report==null||(report.numbers().isEmpty()&&report.lists().isEmpty()))return answer(false,"No supported suggested settings to save").toString();code=report.proposedCode();}
+                    else code=SettingsCode.exportPreset(Map.of(),Map.of());
+                    store.save(action.equals("save")?"":id,form.get("name"),code);
+                }
+                case "rename" -> {var old=store.get(id);store.save(id,form.get("name"),old.code());}
+                case "delete" -> store.delete(id);
+                case "apply" -> {var result=SettingsCode.apply(store.get(id).code());if(!result.ok())return answer(false,"Preset was not applied: "+result.error()).toString();}
+                default -> {return answer(false,"Unknown preset action").toString();}
+            }
+            return answer(true,action.equals("apply")?"Preset applied; saved copy kept":"Saved presets updated; current settings unchanged").toString();
+        }catch(Exception e){return answer(false,e.getMessage()==null?"Could not update presets":e.getMessage()).toString();}
     }
 
     static String preset(String name) {

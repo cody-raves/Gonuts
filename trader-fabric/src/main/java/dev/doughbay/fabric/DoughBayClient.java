@@ -160,6 +160,7 @@ public class DoughBayClient implements ClientModInitializer {
         AUTOMATION_SESSION.setRestStore(config.directory().resolve("market-rests.txt"));
         AUTOMATION_SESSION.setLedgerPath(config.databasePath());
         Tuning.load(config.directory());
+        SavedPresets.load(config.directory());
         StaffWatchReport.start(config.directory(), DoughBayClient::account);
         AUTOMATIC_REPORTS = new AutomaticReportService(
                 net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir(), BugReportBuild.current());

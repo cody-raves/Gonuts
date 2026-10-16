@@ -339,6 +339,7 @@ final class Pages {
             // ---- the pages down the side: the pictures the mod draws, and the panel's own
             const OWN = {
               settings: { label: 'Settings', open: openSettings },
+              analyzer: { label: 'Analyzer', open: openAnalyzer },
               evasion: { label: 'Evasion', open: openEvasion },
               items: { label: 'Items', open: openItems },
               prices: { label: 'Flips', open: openPrices },
@@ -605,6 +606,49 @@ final class Pages {
               catch(e){if(view==='evasion')toast('Could not refresh evasion history. Your settings have been kept.',true);}
               finally{evasionHistoryLoading=false;}
             }
+            async function openSavedPresets() {
+              try {
+                const d=await api('savedpresets'); if(!d.ok){toast(d.note,true);return;}
+                const box=el('section','card');box.appendChild(el('h2','title','Saved presets'));
+                box.appendChild(el('p','desc','Save a baseline, experiment, then apply a saved copy. Account slot counts and follow settings stay as they are.'));
+                const name=el('input');name.maxLength=48;name.placeholder='New preset name';name.setAttribute('aria-label','New preset name');box.appendChild(name);
+                box.appendChild(button('pick','Save current as new',async()=>{const r=await change('savedpresets',{action:'save',name:name.value});if(r&&r.ok)openSavedPresets();}));
+                const search=el('input');search.placeholder='Search saved presets';search.setAttribute('aria-label','Search saved presets');box.appendChild(search);
+                const rows=el('div');box.appendChild(rows);
+                for(const p of d.presets||[]){
+                  const row=el('section','card');row.dataset.name=p.name.toLowerCase();row.appendChild(el('h3','title',p.name));
+                  row.appendChild(el('p','muted','Saved '+new Date(p.savedAt).toLocaleString()));
+                  row.appendChild(button('pick','Apply',async()=>{if(confirm('Apply '+p.name+'? Save your current settings first if you want to switch back. Shared settings affect the hive.')){const r=await change('savedpresets',{action:'apply',id:p.id});if(r&&r.ok)openSettings();}}));
+                  row.appendChild(button('','Copy code',()=>codeToClipboard(p.code)));
+                  row.appendChild(button('','Rename',async()=>{const n=prompt('Preset name',p.name);if(n!==null){const r=await change('savedpresets',{action:'rename',id:p.id,name:n});if(r&&r.ok)openSavedPresets();}}));
+                  row.appendChild(button('','Replace with current',async()=>{if(confirm('Overwrite '+p.name+' with your current settings?')){const r=await change('savedpresets',{action:'replace',id:p.id,name:p.name});if(r&&r.ok)openSavedPresets();}}));
+                  row.appendChild(button('','Delete',async()=>{if(confirm('Delete '+p.name+'? Current settings stay unchanged.')){const r=await change('savedpresets',{action:'delete',id:p.id});if(r&&r.ok)openSavedPresets();}}));
+                  rows.appendChild(row);
+                }
+                search.addEventListener('input',()=>{for(const row of rows.children)row.hidden=!row.dataset.name.includes(search.value.toLowerCase());});
+                box.appendChild(button('','Back to settings',openSettings));own.replaceChildren(box);
+              }catch(e){failed();}
+            }
+            async function codeToClipboard(code){
+              try{await navigator.clipboard.writeText(code);toast('Code copied');}
+              catch(e){const area=el('textarea');area.value=code;area.readOnly=true;own.appendChild(area);area.select();toast('Select and copy the code.');}
+            }
+            async function openAnalyzer(){
+              try{
+                const d=await api('analyzer'),box=el('section','card');box.appendChild(el('h2','title','Local settings analyzer'));
+                box.appendChild(el('p','desc',d.note||''));
+                box.appendChild(button('pick','Analyze local data',async()=>{const r=await change('analyzer',{});if(r&&r.ok){openAnalyzer();setTimeout(()=>{if(view==='analyzer')openAnalyzer();},1500);}}));
+                box.appendChild(button('','Refresh report',openAnalyzer));
+                const report=d.report;
+                if(report){
+                  for(const line of report.baseline||[])box.appendChild(el('p','desc',line));
+                  for(const f of report.findings||[]){const card=el('section','card');card.appendChild(el('h3','title',f.title));card.appendChild(el('p','desc','Evidence: '+f.evidence));card.appendChild(el('p','desc','Suggested experiment: '+f.suggestion));card.appendChild(el('p','muted','Estimate: '+f.estimate));box.appendChild(card);}
+                  if(Object.keys(report.numbers||{}).length||Object.keys(report.lists||{}).length)box.appendChild(button('pick','Save suggested preset',async()=>{const n=prompt('Name for this suggested preset');if(n!==null)await change('savedpresets',{action:'save',source:'proposal',name:n});}));
+                  box.appendChild(button('','Copy report',()=>codeToClipboard(JSON.stringify(report,null,2))));
+                }
+                if(view==='analyzer')own.replaceChildren(box);
+              }catch(e){failed();}
+            }
             async function openSettings() {
               try {
                 S.data = await api('settings');
@@ -787,6 +831,7 @@ final class Pages {
                 try { codeShow((await api('code')).code || '', false); } catch (e) { toast(SILENT, true); }
               }));
               bar.appendChild(button('', 'Paste a code', () => codeShow('', true)));
+              bar.appendChild(button('', 'Saved presets', openSavedPresets));
               const cards = el('div', 'cards');
               for (const g of d.groups || []) {
                 const card = el('section', 'card');

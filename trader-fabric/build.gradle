@@ -192,3 +192,19 @@ if (project.hasProperty('regionMapScreenshots')) {
  }
 }
 tasks.named('jar') { exclude '**/RegionMapGuiSmoke*.class' }
+
+// Disposable offline visual verification; never included in normal releases.
+if (project.hasProperty('presetsAnalyzerScreenshots')) {
+    sourceSets.main.java.srcDir 'src/presetsSmoke/java'
+    tasks.processResources.doLast {
+        def file = destinationDir.toPath().resolve('fabric.mod.json').toFile()
+        def metadata = new groovy.json.JsonSlurper().parse(file)
+        metadata.entrypoints.client.add('dev.doughbay.fabric.PresetsAnalyzerSmoke')
+        file.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(metadata))
+    }
+    loom.runs.client {
+        runDir = System.getenv('LOCALAPPDATA') + '/GoNuts/presets-analyzer-preview'
+        programArgs '--width', '1280', '--height', '960'
+    }
+}
+tasks.named('jar') { exclude '**/PresetsAnalyzerSmoke*.class' }

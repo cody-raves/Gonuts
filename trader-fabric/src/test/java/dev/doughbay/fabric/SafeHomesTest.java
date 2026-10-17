@@ -27,7 +27,7 @@ class SafeHomesTest {
         assertEquals("home vault", SafeHomes.teleportCommand(true));
         assertEquals("home farm", SafeHomes.teleportCommand(true));
         assertEquals("home base", SafeHomes.teleportCommand(true));
-        SafeHomes.saveHomes(""); assertEquals("rtp", SafeHomes.teleportCommand(true));
+        SafeHomes.saveHomes(""); assertEquals("", SafeHomes.teleportCommand(true));
     }
     @Test void savingNamesPreservesAlliesAndOtherFileFieldsAcrossReload() throws Exception {
         Files.writeString(root.resolve("homes.json"),"{\"homes\":[\"old\"],\"allies\":[\"Friend\"],\"other\":17}");

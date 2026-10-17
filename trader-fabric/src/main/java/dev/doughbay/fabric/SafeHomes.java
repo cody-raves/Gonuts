@@ -22,7 +22,7 @@ import java.util.Locale;
  *
  * <p>Read from {@code homes.json} next to the other config:
  * {@code {"homes": ["base", "vault", "north"]}}. An empty or missing file
- * leaves the guard on the random teleport.
+ * cannot supply a home route. Home mode never silently becomes random teleport.
  */
 public final class SafeHomes {
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -165,7 +165,7 @@ public final class SafeHomes {
     /** Rotates attempts in entered order. The names refer to homes already set on the server. */
     public static String teleportCommand(boolean useHomes) {
         String home = useHomes ? next() : "";
-        if (home.isEmpty()) return "rtp";
+        if (home.isEmpty()) return useHomes ? "" : "rtp";
         noteUsed(home);
         return "home " + home;
     }

@@ -4,6 +4,11 @@ What each build changed, newest first. Times are UTC. The mod shows these in
 the update notice, after an update installs, and under What's new on the
 About tab.
 
+## 2026-10-17 01:21 UTC
+
+- Fixed Evasion's low-air water guard and optional Move on every timer bypassing the selected escape action. Disconnect now stays a disconnect; pause and disconnect modes never start optional wandering teleports.
+- Home escape no longer falls back to RTP when no home names are configured. An emergency escape disconnects; optional moves are skipped. Underwater arrival retries respect the current route. Staff Watch's explicitly selected region-switch response remains separate.
+
 ## 2026-10-16 23:42 UTC
 
 - Added named saved presets in Settings: save the current setup, apply an existing copy, rename, copy its Settings code, or explicitly replace/delete it. Saved copies remain independent and survive restarts; empty item lists restore correctly, while account slot counts and follow settings keep their existing import protections.

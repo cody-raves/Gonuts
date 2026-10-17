@@ -510,7 +510,7 @@ public final class EvasionGuard {
                             underwaterRtpCount);
                     teleportFrom = client.player.position();
                     teleportedAt = now;
-                    DoughBayClient.executionDriver().sendWhenClear(client, SafeHomes.teleportCommand(Tuning.get("evasion.use_homes") >= .5));
+                    teleportAway(client);
                     return;
                 }
                 underwaterRtpCount = 0;
@@ -977,8 +977,8 @@ public final class EvasionGuard {
         note(lastIntruder, 0, "under water, air running out");
         clearSinceMillis = 0;
         leaveWanted = false;
-        if (DoughBayClient.executionDriver().refusesTeleports()) {
-            // No teleport to use. Logged off, nothing drowns.
+        if (escapeMode() == 2 || DoughBayClient.executionDriver().refusesTeleports()) {
+            // Respect Disconnect even when teleports are otherwise enabled.
             leave(client, "Evasion: under water and teleports are off; leaving the server");
         } else {
             teleportAway(client);
@@ -1123,6 +1123,22 @@ public final class EvasionGuard {
         }
         try {
             if (client.getConnection() == null) return;
+            boolean useHomes = Tuning.get("evasion.use_homes") >= .5;
+            var route = EvasionRoute.action(escapeMode(), useHomes, !SafeHomes.homes().isEmpty());
+            if (route == EvasionRoute.Action.PAUSE) {
+                teleportedAt = 0;
+                triggered = true;
+                clearSinceMillis = 0;
+                DoughBayClient.LOGGER.info("DoughBay evasion: escape action is pause; no teleport sent");
+                return;
+            }
+            if (route == EvasionRoute.Action.DISCONNECT) {
+                teleportedAt = 0;
+                leave(client, useHomes && SafeHomes.homes().isEmpty() && escapeMode() == 1
+                        ? "Evasion: home escape selected but no homes configured; disconnecting without RTP"
+                        : "Evasion: disconnect escape selected; leaving without teleporting");
+                return;
+            }
             // Teleports are refused at the send gate, so arming the warm-up
             // here would guarantee it expires - and the expiry path leaves the
             // server, which then rejoins, which looks exactly like the client
@@ -1136,11 +1152,13 @@ public final class EvasionGuard {
                 clearSinceMillis = 0;
                 return;
             }
+            String command = SafeHomes.teleportCommand(useHomes);
+            if (command.isEmpty()) {
+                leave(client, "Evasion: no configured home available; disconnecting without RTP");
+                return;
+            }
             teleportFrom = client.player.position();
             teleportedAt = System.currentTimeMillis();
-            // A named home is lit, enclosed and known; the random teleport is
-            // only the fallback when none are configured.
-            String command = SafeHomes.teleportCommand(Tuning.get("evasion.use_homes") >= .5);
             String home = command.startsWith("home ") ? command.substring(5) : "";
             String message = "Evasion: " + lastIntruder + " came too close; "
                     + (home.isEmpty() ? "teleporting away" : "going to home '" + home + "'");
@@ -1172,7 +1190,8 @@ public final class EvasionGuard {
      */
     private void wander(Minecraft client, AutomationSessionController session, long now) {
         long every = (long) (Tuning.get("evasion.wander_every_min") * 60_000);
-        if (every <= 0) {
+        if (every <= 0 || !EvasionRoute.mayWander(escapeMode(),
+                Tuning.get("evasion.use_homes") >= .5, !SafeHomes.homes().isEmpty())) {
             wanderAt = 0;
             return;
         }
@@ -1205,11 +1224,12 @@ public final class EvasionGuard {
             DoughBayClient.LOGGER.info("DoughBay evasion: topping up from the shelf before moving on");
             return;
         }
+        String command = SafeHomes.teleportCommand(Tuning.get("evasion.use_homes") >= .5);
+        if (command.isEmpty()) { wanderAt = 0; return; }
         wanderAt = now + jitteredWander(every);
         teleportFrom = client.player.position();
         teleportedAt = now;
         wandering = true;
-        String command = SafeHomes.teleportCommand(Tuning.get("evasion.use_homes") >= .5);
         DoughBayClient.LOGGER.info("DoughBay evasion: moving on with nobody about; /{}", command);
         DoughBayClient.executionDriver().sendWhenClear(client, command);
     }

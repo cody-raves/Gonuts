@@ -27,6 +27,31 @@ public final class LedgerStatsProvider implements PerformanceStatsProvider {
     private volatile PerformanceStatsSnapshot paper =
             PerformanceStatsSnapshot.empty(PerformanceStatsSnapshot.Mode.PAPER, "No paper ledger");
     private volatile long refreshedAt;
+    record CapitalCache(Map<String,long[]> byAccount,long at,long unattributed) {
+        CapitalBreakdown.Stock account(String name){
+            if(at<=0||name==null||name.isBlank())return null;
+            long[] costs=byAccount.getOrDefault(name.toLowerCase(Locale.ROOT),new long[4]);
+            return new CapitalBreakdown.Stock(at,costs[0],costs[1],costs[2],costs[3],unattributed);
+        }
+    }
+    private volatile CapitalCache capitalCache=new CapitalCache(Map.of(),0,0);
+    public CapitalBreakdown.Stock capital(String account) {
+        return capitalCache.account(account);
+    }
+    static CapitalCache readCapital(Database db,long now)throws Exception{
+        Map<String,long[]> rows=new LinkedHashMap<>();long unknown=0;
+        try(var stmt=db.connection().prepareStatement("SELECT client,status,COALESCE(SUM(purchase_price),0),COALESCE(SUM(target_price),0) FROM positions WHERE mode='REAL' AND status IN ('PURCHASED','LISTED','UNRESOLVED','EXPIRED') GROUP BY client,status")){try(var rs=stmt.executeQuery()){
+            while(rs.next()){
+                String owner=rs.getString(1),state=rs.getString(2);long cost=Math.max(0,rs.getLong(3));
+                if(owner==null||owner.isBlank()){unknown=Math.addExact(unknown,cost);continue;}
+                long[] row=rows.computeIfAbsent(owner.toLowerCase(Locale.ROOT),key->new long[4]);
+                if(state.equals("PURCHASED"))row[0]=Math.addExact(row[0],cost);
+                else if(state.equals("LISTED")){row[1]=Math.addExact(row[1],cost);row[2]=Math.addExact(row[2],Math.max(0,rs.getLong(4)));}
+                else row[3]=Math.addExact(row[3],cost);
+            }
+        }}
+        return new CapitalCache(Map.copyOf(rows),now,unknown);
+    }
     private volatile Map<ItemBoard.Range, ItemBoard.Board> boards = Map.of();
 
     LedgerStatsProvider(Path databasePath) {
@@ -66,6 +91,7 @@ public final class LedgerStatsProvider implements PerformanceStatsProvider {
         List<Position> positions;
         try (Database db = new Database(databasePath)) {
             positions = new PositionRepository(db).findAll("REAL");
+            try { capitalCache=readCapital(db,System.currentTimeMillis()); } catch(Exception unavailable) { capitalCache=new CapitalCache(Map.of(),0,0); }
         }
         long now = System.currentTimeMillis();
         real = build(PerformanceStatsSnapshot.Mode.REAL, positions, now);

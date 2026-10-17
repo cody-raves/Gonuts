@@ -77,6 +77,9 @@ public final class SidebarBalance {
         return s >= 0 && System.currentTimeMillis() - readAt <= FRESH_MILLIS ? s : -1;
     }
 
+    /** Timestamp of the currently usable sidebar observation, not a market refresh. */
+    static long observedAt() { return current() >= 0 ? readAt : 0; }
+
     /** A regional join must not reuse the previous connection's cached balance. */
     public static boolean freshSince(long since) {
         return since > 0 && readAt >= since && current() >= 0;

@@ -991,7 +991,7 @@ public final class DoughBayScreen extends Screen {
             case ITEMS -> renderItems(graphics, ui, mouseX, mouseY);
             case FLIPS -> renderFlips(graphics, ui, mouseX, mouseY);
             case STATS -> renderStats(graphics, current, ui, mouseX, mouseY);
-            case ANALYZER -> analyzerPanel.render(graphics, font);
+            case ANALYZER -> analyzerPanel.render(graphics, font, mouseX, mouseY, pendingTooltip);
             case RIVALS -> renderRivals(graphics, ui, mouseX, mouseY);
             case SETTINGS -> renderSettings(graphics, ui, mouseX, mouseY);
             case EVASION -> renderSettings(graphics, ui, mouseX, mouseY);

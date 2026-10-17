@@ -25,3 +25,13 @@ Save suggested preset creates a named snapshot for review. It never applies sugg
 ## Scope
 
 This is a standalone local-client feature. Hosted dashboard enrollment, community uploads, scan-reduction trials and backend rollout flags are separate and unchanged. No model API or external analysis service is required.
+
+## Capital charts and money tied up
+
+Run Analyze again to capture an up-to-date report and include the newest recorded history. The capital view belongs to the current account. It separates available bank, observed unfilled order funds, delivered order goods minus recorded collections, collected/unlisted stock at purchase cost, auction stock at purchase cost, and unresolved exposure at its recorded cost. Asking prices are shown separately as potential gross revenue and never included in the pie or booked profit. A lower bank balance alone is not evidence of a loss.
+
+Identical orders share a collection counter, so delivered quantities are aggregated before collections are subtracted once. Cancelled orders have no remaining reserved funds. Collected stock is counted from its current ledger status; cancelled retail parent positions and other hive accounts are excluded. Unattributed legacy records are flagged rather than assigned to this account. Own-order coverage is only the rows actually observed: the current reader cannot certify that every own-order page was read. Amounts are observations, not a complete net-worth statement.
+
+Open Capital charts in the GUI; Previous/Next changes the history category, and the range button chooses 1 hour, 24 hours or 7 days. Hover pie slices, numbered category labels or history marks for amount, snapshot time and source-read time. The web Analyzer has the same allocation chart, category/time selectors and hover details. Source notes and unknown amounts remain visible. The bank source is a fresh sidebar read (at its displayed resolution), or an actually timestamped API balance read, not the last general market refresh. Bank/order observations older than five minutes and ledger costs older than 30 seconds are excluded rather than drawn as zero.
+
+The client records a local snapshot every five minutes while running and keeps up to seven days in gonuts-capital-history under the game directory. Files are separated by a hash of the account name so independent hive clients do not duplicate the same account's bank into a hive total. Nothing is sent to the backend. The timeline begins when recording starts; there is no invented past bank/order history. Bars represent individual snapshots, leaving offline and unknown periods blank instead of interpolating them. A corrupt history file is kept unchanged and recording is disabled for that file.

@@ -2679,6 +2679,11 @@ public final class AutomationSessionController {
         return true;
     }
 
+    /** Read-only accounting view; never corrects counters, scans pages or collects stock. */
+    public synchronized dev.doughbay.fabric.CapitalBreakdown.Orders capitalOrders() {
+        return dev.doughbay.fabric.CapitalBreakdown.orders(ownOrdersReadAt, List.copyOf(ownOrders), java.util.Map.copyOf(collectedByKey));
+    }
+
     /** One parked listing, for the slot tracker on the screen and the HUD. */
     public record OpenListingView(long positionId, String itemKey, int quantity,
                                   long purchasePrice, long targetPrice, long listedAt) {

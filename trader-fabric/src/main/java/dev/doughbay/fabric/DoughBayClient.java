@@ -180,6 +180,7 @@ public class DoughBayClient implements ClientModInitializer {
         EVASION = new EvasionGuard(config.directory().resolve("evasion.txt"));
         EvasionGuard.setLedger(config.databasePath());
         LEDGER_STATS = new LedgerStatsProvider(config.databasePath());
+        CapitalHistory.start(net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir());
         // The audit baseline: the balance at the last slot check, carried
         // forward by receipted sales, purchases and payouts since. Positions
         // lately booked as returned come along so the check can take back any

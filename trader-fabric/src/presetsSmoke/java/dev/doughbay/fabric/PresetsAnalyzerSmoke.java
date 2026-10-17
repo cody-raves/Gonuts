@@ -26,17 +26,21 @@ public final class PresetsAnalyzerSmoke implements ClientModInitializer {
     case 1->{if(ticks<30)return;capture(mc,"presets-preview.png");
       var f=SettingsAnalyzer.class.getDeclaredField("report");f.setAccessible(true);
       f.set(null,new SettingsAnalyzer.Report(System.currentTimeMillis(),List.of("DEMO PREVIEW — invented figures; not live trading data", "24h local ledger: 240 sales; $4,800,000 realized profit", "24h wall-clock average: $200,000/h; 10 sales/h", "This account bank: $20,000,000; effective purchase cap $2,800,000", "2 active clients; this account slot limit 90", "Recorded account active time: 12h; not used to divide hive profit"),
-       List.of(new SettingsAnalyzer.Finding("DEMO Review a weak market","10 completed sales lost $20,000; two positions remain open.","Trial a replacement while preserving management of existing stock.","No profit/hour uplift established; compare actual results after the trial.")),Map.of(),Map.of(),"",""));
+       List.of(new SettingsAnalyzer.Finding("DEMO Review a weak market","10 completed sales lost $20,000; two positions remain open.","Trial a replacement while preserving management of existing stock.","No profit/hour uplift established; compare actual results after the trial.")),Map.of(),Map.of(),"","",demoCapital(System.currentTimeMillis(),20000000),
+       List.of(demoCapital(System.currentTimeMillis()-900000,26000000),demoCapital(System.currentTimeMillis()-600000,24000000),demoCapital(System.currentTimeMillis()-300000,22000000),demoCapital(System.currentTimeMillis(),20000000)),"DEMO sampled history — invented data"));
       var status=SettingsAnalyzer.class.getDeclaredField("status");status.setAccessible(true);status.set(null,"DEMO PREVIEW — analysis changes no settings");
       var screen=new DoughBayScreen(DoughBayClient.watcher());var tab=DoughBayScreen.class.getDeclaredField("tab");tab.setAccessible(true);
       @SuppressWarnings({"unchecked","rawtypes"}) Object value=Enum.valueOf((Class)tab.getType(),"ANALYZER");tab.set(screen,value);mc.gui.setScreen(screen);phase++;ticks=0;}
     case 2->{if(ticks<30)return;capture(mc,"analyzer-preview.png");mc.options.guiScale().set(1);mc.resizeGui();phase++;ticks=0;}
     case 3->{if(ticks<30)return;capture(mc,"analyzer-wide-preview.png");
       ((net.minecraft.client.gui.components.Button)net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(mc.gui.screen()).stream().filter(w->w.getMessage().getString().equals("Next")).findFirst().orElseThrow()).onPress(null);phase++;ticks=0;}
-    case 4->{if(ticks<30)return;capture(mc,"analyzer-finding-preview.png");phase=99;mc.stop();}
+    case 4->{if(ticks<30)return;capture(mc,"analyzer-finding-preview.png");
+      ((net.minecraft.client.gui.components.Button)net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(mc.gui.screen()).stream().filter(w->w.getMessage().getString().equals("Capital charts")).findFirst().orElseThrow()).onPress(null);phase++;ticks=0;}
+    case 5->{if(ticks<30)return;capture(mc,"capital-charts-preview.png");phase=99;mc.stop();}
    }
   }catch(Exception e){try{Files.writeString(Path.of("preview-error.txt"),e.toString());}catch(Exception ignored){}phase=99;mc.stop();}
  }
+    private CapitalBreakdown.Snapshot demoCapital(long at,long bank){return new CapitalBreakdown.Snapshot(at,bank,3000000L,2000000L,1000000L,6000000L,500000L,8000000L,at,at,at,List.of("DEMO preview: invented capital observations"));}
     private void capture(Minecraft mc, String name) throws Exception {
         int w = mc.getWindow().getWidth(), h = mc.getWindow().getHeight();
         int fb = glGetInteger(GL_READ_FRAMEBUFFER_BINDING), pack = glGetInteger(GL_PIXEL_PACK_BUFFER_BINDING), align = glGetInteger(GL_PACK_ALIGNMENT);

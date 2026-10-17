@@ -18,7 +18,11 @@ public final class SettingsAnalyzer {
     }
     public record Report(long builtAt, List<String> baseline, List<Finding> findings,
                          Map<String, Double> numbers, Map<String, String> lists,
-                         String currentCode, String proposedCode) { }
+                         String currentCode, String proposedCode, CapitalBreakdown.Snapshot capital, List<CapitalBreakdown.Snapshot> capitalHistory,String capitalHistoryStatus) {
+        public Report(long builtAt,List<String> baseline,List<Finding> findings,Map<String,Double> numbers,Map<String,String> lists,String currentCode,String proposedCode){
+            this(builtAt,baseline,findings,numbers,lists,currentCode,proposedCode,null,List.of(),"No recorded capital history");
+        }
+    }
     private static volatile Report report;
     private static volatile CompletableFuture<Void> pending;
     private static volatile String status = "Press Analyze to review your local trading history";
@@ -40,21 +44,34 @@ public final class SettingsAnalyzer {
         for (var list : Tuning.LISTS) if (!list.key().equals("webhook.url")) texts.put(list.key(),Tuning.text(list.key()));
         String current = SettingsCode.exportPreset(values, texts);
         long now = System.currentTimeMillis();
+        var capital = CapitalHistory.capture();
+        var capitalHistory = CapitalHistory.points();
         pending = CompletableFuture.runAsync(() -> {
             try {
                 var ledger = DoughBayClient.ledgerStats();
                 var board = ledger == null ? ItemBoard.Board.empty(ItemBoard.Range.DAY) : ledger.board(ItemBoard.Range.DAY);
                 var follows = DoughBayClient.follows();
-                var input = new Input(now, market == null || market.demo() ? -1 : market.accountBalance(), capturedCap,
+                var input = new Input(now, capital.bank()==null?-1:capital.bank(), capturedCap,
                     (int)values.getOrDefault("slots.max",0d).doubleValue(), accounts, session.lifetimeActiveMillis(), board,
                     tracked, market == null || market.demo() ? List.of() : market.opportunities(),
                     follows == null ? List.of() : follows.recent(now-86_400_000L),
                     market != null && !market.demo() && market.updatedAt() > 0 && now-market.updatedAt() <= 300_000, values, session.openListings(),market == null || market.demo()?List.of():market.markets());
                 Report analyzed = analyze(input);
+                var baseline = new ArrayList<>(analyzed.baseline());
+                baseline.add("CAPITAL — this account, observed at purchase cost; not booked profit");
+                for(int i=0;i<CapitalBreakdown.LABELS.size();i++)baseline.add(CapitalBreakdown.LABELS.get(i)+": "+(capital.value(i)==null?"unknown":money(capital.value(i))));
+                baseline.add("Auction asking prices (potential gross revenue): "+(capital.asking()==null?"unknown":money(capital.asking())));
+                baseline.addAll(capital.notes());
+                var findings = new ArrayList<>(analyzed.findings());
+                if((capital.orders()!=null&&capital.orders()>0)||(capital.awaitingCollection()!=null&&capital.awaitingCollection()>0)||(capital.unlisted()!=null&&capital.unlisted()>0)||(capital.listed()!=null&&capital.listed()>0)){
+                    findings.add(0,new Finding("Capital is working through orders and stock","The capital breakdown shows funds committed to orders or recorded stock, separately from available bank.",
+                        "Collect filled orders, list available stock and check aging listings through normal controls. A lower cash balance alone is not proof of a loss.",
+                        "Only settled sales book profit. Asking prices and unfilled orders are not realized earnings."));
+                }
                 var proposedNumbers = new LinkedHashMap<>(values); proposedNumbers.putAll(analyzed.numbers());
                 var proposedLists = new LinkedHashMap<>(texts); proposedLists.putAll(analyzed.lists());
-                report = new Report(analyzed.builtAt(), analyzed.baseline(), analyzed.findings(), analyzed.numbers(), analyzed.lists(),
-                    current, SettingsCode.exportPreset(proposedNumbers, proposedLists));
+                report = new Report(analyzed.builtAt(), List.copyOf(baseline), List.copyOf(findings), analyzed.numbers(), analyzed.lists(),
+                    current, SettingsCode.exportPreset(proposedNumbers, proposedLists),capital,capitalHistory,CapitalHistory.status());
                 status = "Analysis ready; no settings were changed";
             } catch (Exception failure) { status = "Analysis unavailable; existing settings and report kept"; }
         });

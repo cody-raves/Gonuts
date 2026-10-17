@@ -8,6 +8,7 @@ About tab.
 
 - Added named saved presets in Settings: save the current setup, apply an existing copy, rename, copy its Settings code, or explicitly replace/delete it. Saved copies remain independent and survive restarts; empty item lists restore correctly, while account slot counts and follow settings keep their existing import protections.
 - Added a local Analyzer tab in the GUI and web panel. It reviews the 24-hour ledger, bankroll, purchase limits, active hive client count, this account's slot capacity and recorded uptime, plus observed opportunities and follow notices. Findings separate measured performance from conditional estimates and can be saved as a suggested preset without applying changes.
+- Analyzer now separates bank, funds committed to observed orders, goods awaiting collection, unlisted stock, auction cost basis and unresolved exposure. A numbered capital chart and sampled timeline include hover details and 1-hour/24-hour/7-day ranges. Asking prices stay separate from realized profit; stale or unverified categories stay unknown. History records locally from installation onward, without reconstructing past balances.
 - Analysis runs locally, dispatches no trades and sends no analytics or settings to a backend. Market suggestions require fresh non-demo observations and sufficient sales evidence. Historical results are not attributed to the current configuration.
 
 ## 2026-10-16 23:00 UTC

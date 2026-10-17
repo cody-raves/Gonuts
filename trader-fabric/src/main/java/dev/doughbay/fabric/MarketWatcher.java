@@ -249,6 +249,10 @@ public final class MarketWatcher {
      *        a real and common state — no username, a failed request, an API
      *        that does not know the player — and must not read as zero.
      */
+    public record BalanceObservation(String account,long value,long at) { }
+    private volatile BalanceObservation capitalBalance = new BalanceObservation("",-1,0);
+    BalanceObservation balanceObservation() { return capitalBalance; }
+
     public record Snapshot(List<Opportunity> opportunities,
                            List<MarketService.NearMiss> nearMisses,
                            List<MarketStats> markets,
@@ -831,6 +835,7 @@ public final class MarketWatcher {
                 if (System.currentTimeMillis() >= nextBalanceAt) {
                     accountName = signedInPlayerName();
                     accountBalance = fetchBalance(client, accountName);
+                    capitalBalance = new BalanceObservation(accountName,accountBalance,System.currentTimeMillis());
                     if (accountBalance >= 0) {
                         DoughBayClient.LOGGER.info("DoughBay balance: {} ({})", accountBalance, accountName);
                         try {

@@ -568,7 +568,7 @@ final class Pages {
                 }
                 const activity=el('section','card');activity.id='evasion-history';
                 own.replaceChildren(el('h2','','Evasion'),activity,actions,el('label','','Named homes'),homes,save,
-                  el('p','muted','Set these homes on the server first. Enter names only, separated by commas. /home cycles in entered order; an empty list falls back to /rtp. Hive clients sharing this list need the same home names.'),cards);
+                  el('p','muted','Set these homes on the server first. Enter names only, separated by commas. /home cycles in entered order. With home mode selected, an empty list disconnects on escape and skips optional moves; it never uses /rtp. Hive clients sharing this list need the same home names.'),cards);
                 drawEvasionHistory(data);
               }catch(e){failed();}
             }

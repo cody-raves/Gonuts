@@ -679,7 +679,7 @@ public final class Tuning {
                     "An arrow, potion or fireball already flying towards you within this range triggers the escape at once. 0 ignores projectiles",
                     0, 0, 48, Kind.BLOCKS),
             new Setting("evasion.use_homes", "Evasion", "Escape to a home",
-                    "Use /home and cycle through the names in the Evasion tab in entered order (1), or use /rtp (0). Names must already be set on the server. An empty home list falls back to /rtp",
+                    "Use /home and cycle through the names in the Evasion tab in entered order (1), or use /rtp (0). Names must already be set on the server. If home escape is selected with no saved homes, disconnect rather than use /rtp",
                     0, 0, 1, Kind.TOGGLE),
             new Setting("evasion.mob_blocks", "Evasion", "Run from hostile mobs within",
                     "A hostile mob this close sends the bot away before it can be hit. Only mobs that attack "
@@ -764,7 +764,7 @@ public final class Tuning {
                     "Teleport somewhere new this often even with nobody about, give or take half the interval. "
                     + "The escape teleport only fires once you have been noticed; standing in one hole all day is "
                     + "what gets you noticed. Nothing is interrupted - the bot trades through commands and never "
-                    + "touches the world. 0 to stay put",
+                    + "touches the world. Only active with the teleport escape action and a valid selected route. 0 to stay put",
                     45, 0, 360, Kind.MINUTES),
             new Setting("evasion.rtp_wait_sec", "Evasion", "Teleport warm-up",
                     "How long the server takes to move you after the teleport command; the client leaves the server if nothing has happened by then",

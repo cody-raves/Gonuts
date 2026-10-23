@@ -7,7 +7,7 @@ import java.util.Map;
 
 class BugReportTransportTest {
     private static byte[] capabilitiesOfSize(int size) {
-        String body = "{\"schemaVersions\":[1,2],\"maxBodyBytes\":32768,\"diagnosticLog\":{\"supported\":true,\"schemaVersion\":2,\"maxBytes\":8192,\"maxLines\":200,\"maxLineChars\":500}}";
+        String body = "{\"schemaVersions\":[1,2],\"maxBodyBytes\":65536,\"diagnosticLog\":{\"supported\":true,\"schemaVersion\":2,\"maxBytes\":24576,\"maxLines\":200,\"maxLineChars\":500}}";
         return (body + " ".repeat(size - body.length())).getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
     @Test void manualCapabilityGateAcceptsExpandedReceiverMetadata() throws Exception {
@@ -116,9 +116,9 @@ class BugReportTransportTest {
     }
     @Test void exactAuthenticatedCapabilitiesShapeControlsAttachmentSupport() throws Exception {
         var json = new ObjectMapper();
-        String capabilities = "{\"schemaVersions\":[1,2],\"maxBodyBytes\":32768,\"diagnosticLog\":{\"supported\":true,\"schemaVersion\":2,\"maxBytes\":8192,\"maxLines\":200,\"maxLineChars\":500}}";
+        String capabilities = "{\"schemaVersions\":[1,2],\"maxBodyBytes\":65536,\"diagnosticLog\":{\"supported\":true,\"schemaVersion\":2,\"maxBytes\":24576,\"maxLines\":200,\"maxLineChars\":500}}";
         assertTrue(BugReportTransport.advertisesLogSupport(json.readTree(capabilities)));
-        assertFalse(BugReportTransport.advertisesLogSupport(json.readTree(capabilities.replace("8192","4096"))));
+        assertFalse(BugReportTransport.advertisesLogSupport(json.readTree(capabilities.replace("24576","8192"))));
         assertFalse(BugReportTransport.advertisesLogSupport(json.readTree(capabilities.replace("[1,2]","[1]"))));
         assertFalse(BugReportTransport.advertisesLogSupport(json.readTree("{}")));
     }

@@ -51,6 +51,8 @@ public final class ActionTrace {
         Entry next = new Entry(++sequence, scope, event, token, safeReason,
                 same ? old.first : now, now, same ? Math.min(1_000_000_000L, old.count + 1) : 1,
                 Math.max(-1, quantity), Math.max(-1, price), Math.max(-1, ceiling), safeMarket);
+        if (!same) DecisionTrace.INSTANCE.record(scope,event,code,DecisionTrace.actionReason(safeReason),safeMarket,
+                -1,quantity,price,ceiling,now);
         if (same) recent.remove(old);
         recent.addLast(next);
         while (recent.size() > 48) recent.removeFirst();

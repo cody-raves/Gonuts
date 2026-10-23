@@ -147,6 +147,7 @@ public final class HostedDashboardClient {
     public void reconnect(){if(!started||!view.linked()||view.busy())return;SwarmRank.clear();SwarmStaffSightings.INSTANCE.clear();worker.execute(()->{rankingSalt="";publishedAccountId="";epochs.incrementAndGet();commands.disconnected(epoch);panel.disconnected(epoch);attempts=0;nextConnect=0;if(socket!=null)socket.abort();socket=null;welcome=false;connecting=false;});}
     /** Called on the client thread: only reads already-held figures, never SQL or networking. */
     public void tick(Minecraft client){
+        DecisionTrace.INSTANCE.observeSettings(System.currentTimeMillis());
         CommunityClient.INSTANCE.dashboardLinked(view.linked());
         long now=System.currentTimeMillis();String account=DoughBayClient.account();panelAccount=account;CommunityClient.INSTANCE.account(account);CommunityRegion.tick(client);CommunityClient.INSTANCE.connected(CommunityRegion.donut(client));CommunityPerformance.INSTANCE.tick(CommunityRegion.donut(client),System.nanoTime());
         if(activity==null||!activityAccount.equals(account)){activity=new DashboardActivityCounters(now);activityAccount=account;SwarmRank.clear();SwarmStaffSightings.INSTANCE.clear();staffPending.set(null);}

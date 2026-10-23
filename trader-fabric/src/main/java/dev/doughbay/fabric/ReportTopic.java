@@ -5,6 +5,7 @@ import java.util.*;
 /** Text selects a fixed evidence policy, never a log query, path, command or output string. */
 public enum ReportTopic {
     GENERAL, FLIPS, AUCTION, RECOVERY, HIVE, DASHBOARD, EVASION, COMMUNITY;
+    public static ReportTopic infer(String happened,String expected){return infer(Objects.requireNonNullElse(happened,"")+"\n"+Objects.requireNonNullElse(expected,""));}
     public static ReportTopic infer(String description) {
         String s=description==null?"":description.toLowerCase(Locale.ROOT);
         if(s.contains("flip")||s.contains("order")||s.contains("bid"))return FLIPS;

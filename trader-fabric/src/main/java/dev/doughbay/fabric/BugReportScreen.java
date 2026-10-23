@@ -87,7 +87,7 @@ public final class BugReportScreen extends Screen {
                 String version = BugReportBuild.current();
                 var next = new BugReportPayload(version, "26.2", description, expectation,
                     BugReportDiagnostics.readCountersForReport(FabricLoader.getInstance().getGameDir().resolve("logs/latest.log")));
-                String excerpt = BugReportEvidence.readForReport(FabricLoader.getInstance().getGameDir().resolve("logs/latest.log"),description);
+                String excerpt = BugReportEvidence.readForReport(FabricLoader.getInstance().getGameDir().resolve("logs/latest.log"),description,expectation);
                 next.json(excerpt); return new Prepared(next, excerpt);
             } catch (Exception e) { return null; }
         }).thenAccept(result -> minecraft.execute(() -> {

@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 
 /** Deny-by-default diagnostic excerpt: regenerate recognized events; never copy message text. */
 public final class BugReportLog {
-    public static final int MAX_BYTES = 8192;
+    public static final int MAX_BYTES = 24576;
     private static final Pattern TIME = Pattern.compile("^\\[(\\d{2}:\\d{2}:\\d{2})\\]");
     private static final Pattern STATE = Pattern.compile("DoughBay automation \\[(SCANNING|BID_DESK|PREPARING_LIST|LISTING|MONITORING|COOLDOWN|PAUSED|STOPPED|IDLE|BUYING|REPRICING)\\]");
     private static final Pattern FRAME = Pattern.compile("^\\s*at (?:[\\w.]+//)?(dev\\.doughbay\\.[A-Za-z0-9_.$]+)\\(([A-Za-z0-9_$]+\\.java):(\\d{1,6})\\)\\s*$");
@@ -73,7 +73,9 @@ public final class BugReportLog {
                 String prefix = time.find() ? "[" + time.group(1) + "] " : "";
                 var state = STATE.matcher(raw);
                 String action=ActionTrace.sanitizedLogLine(raw);
-                if(action!=null)out=prefix+action;
+                String decision=DecisionTrace.fromLog(raw);
+                if(decision!=null)out=decision;
+                else if(action!=null)out=prefix+action;
                 else if (state.find()) {
                     String current = state.group(1);
                     String reason = "";

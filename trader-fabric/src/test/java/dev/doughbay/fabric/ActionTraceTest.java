@@ -83,7 +83,7 @@ class ActionTraceTest {
         String excerpt=BugReportLog.sanitize(raw.toString(),ReportTopic.FLIPS);
         assertTrue(excerpt.contains(flip));
         assertTrue(excerpt.indexOf("scope=FLIPS")<excerpt.indexOf("scope=DASHBOARD"));
-        assertTrue(excerpt.getBytes(StandardCharsets.UTF_8).length<=8192);
+        assertTrue(excerpt.getBytes(StandardCharsets.UTF_8).length<=BugReportLog.MAX_BYTES);
         assertEquals(ReportTopic.FLIPS,ReportTopic.infer("the flip bot won't collect orders"));
         assertEquals(ReportTopic.HIVE,ReportTopic.infer("Create hive is unresponsive"));
         assertEquals(ReportTopic.GENERAL,ReportTopic.infer("Bearer private-user-input"));

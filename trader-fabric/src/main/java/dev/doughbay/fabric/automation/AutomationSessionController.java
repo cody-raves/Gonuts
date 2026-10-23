@@ -3753,6 +3753,10 @@ public final class AutomationSessionController {
             watchCandidates = List.copyOf(watched);
             watchBuy = true;
             pendingOpportunity = watched.get(0);
+            dev.doughbay.fabric.DecisionTrace.INSTANCE.record(dev.doughbay.fabric.ActionTrace.Scope.MARKET,
+                    dev.doughbay.fabric.ActionTrace.Event.REQUEST,dev.doughbay.fabric.DecisionTrace.Code.WATCH_SELECTED,
+                    dev.doughbay.fabric.DecisionTrace.Reason.NONE,pendingOpportunity.listing().itemId(),
+                    watched.size(),1,-1,-1,now);
             pendingIsSlow = !quickCandidate(pendingOpportunity);
             candidateCoverageBoundaryMillis = 0;
             clearCoverageEvidence();
@@ -5988,10 +5992,11 @@ public final class AutomationSessionController {
         List<MarketStats> refreshPrices = new ArrayList<>();
         double minimumConfidence = dev.doughbay.fabric.Tuning.get("orders.bid_min_confidence");
         double minimumSamples = dev.doughbay.fabric.Tuning.get("orders.bid_min_samples");
-        java.util.Map<String, Integer> why = new java.util.LinkedHashMap<>();
+        var why = new dev.doughbay.fabric.DecisionTrace.Counts();
         boolean onlyOwn = ownOnly();
         noteSplit(snapshot, now);
         for (MarketStats m : snapshot.markets()) {
+            why.candidate(m.itemKey(),(long)stacks*fullStack(m.itemKey()));
             if (onlyOwn) { bump(why, "only your price list is traded"); continue; }
             if (!m.hasPrices() || m.itemKey().indexOf('#') >= 0) { bump(why, "no prices"); continue; }
             if (hasRetailStock(m.itemKey())) { bump(why, "retail stock already held"); continue; }
@@ -6145,6 +6150,7 @@ public final class AutomationSessionController {
         int placed = 0;
         refreshStackTrack(now);
         for (MarketStats m : candidates) {
+            why.candidate(m.itemKey(),(long)stacks*fullStack(m.itemKey()));
             if (free <= 0) break;
             if (chosen.contains(m.itemKey())) continue;
             RetailPricing.Plan retail = retailPlan(m.itemKey(), now, minimumProfit, minimumRoi);
@@ -6342,9 +6348,16 @@ public final class AutomationSessionController {
                     track == null ? ", unproven" : String.format(java.util.Locale.ROOT, ", ours sold %d in ~%.0f min",
                             track.sold(), track.avgMinutesListed()),
                     roomInMarket < sized ? ", listing cap" : "");
+            dev.doughbay.fabric.DecisionTrace.INSTANCE.record(dev.doughbay.fabric.ActionTrace.Scope.DESK,dev.doughbay.fabric.ActionTrace.Event.OBSERVATION,dev.doughbay.fabric.DecisionTrace.Code.ORDER_DEPTH,dev.doughbay.fabric.DecisionTrace.Reason.DEPTH_CAP,m.itemKey(),stacks,depthStacks,unit,room,now);
+            dev.doughbay.fabric.DecisionTrace.INSTANCE.record(dev.doughbay.fabric.ActionTrace.Scope.DESK,dev.doughbay.fabric.ActionTrace.Event.OBSERVATION,dev.doughbay.fabric.DecisionTrace.Code.ORDER_SALES,dev.doughbay.fabric.DecisionTrace.Reason.ADAPTIVE_BATCH,m.itemKey(),stacks,sized,track == null ? -1 : track.sold(),roomInMarket,now);
             long cost = unit * count;
             if (cost > effectivePurchaseCap()) { bump(why, "over the buy cap"); continue; }
             if (cost > room) { bump(why, "no room left"); continue; }
+            dev.doughbay.fabric.DecisionTrace.INSTANCE.record(dev.doughbay.fabric.ActionTrace.Scope.DESK,dev.doughbay.fabric.ActionTrace.Event.REQUEST,dev.doughbay.fabric.DecisionTrace.Code.ORDER_PLAN,
+                    shaped == OrderShape.Mode.SINGLES ? dev.doughbay.fabric.DecisionTrace.Reason.SINGLE_ALLOTMENT
+                    : shaped == OrderShape.Mode.STACKS ? dev.doughbay.fabric.DecisionTrace.Reason.STACK_BATCH
+                    : retail != null ? dev.doughbay.fabric.DecisionTrace.Reason.RETAIL_BATCH : dev.doughbay.fabric.DecisionTrace.Reason.ADAPTIVE_BATCH,
+                    m.itemKey(),(long)stacks*full,count,unit,(long)Math.min(effectivePurchaseCap(),room),now);
             room -= cost;
             free--;
             placed++;
@@ -6694,6 +6707,7 @@ public final class AutomationSessionController {
 
     private static void bump(java.util.Map<String, Integer> counts, String reason) {
         counts.merge(reason, 1, Integer::sum);
+        if(counts instanceof dev.doughbay.fabric.DecisionTrace.Counts decisions)decisions.rejected(reason);
     }
 
     // ------------------------------------------------------------------

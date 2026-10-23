@@ -52,7 +52,7 @@ public record BugReportPayload(String build, String minecraftVersion, String des
             grouping.put("kind",automatic.kind().name());grouping.put("signature",automatic.signature().name());
             grouping.put("fingerprint",automatic.fingerprint());
             byte[] bytes=JSON.writeValueAsBytes(body);
-            if(bytes.length>32768)throw new IllegalArgumentException("Automatic report exceeds receiver size limit");
+            if(bytes.length>65536)throw new IllegalArgumentException("Automatic report exceeds receiver size limit");
             return bytes;
         } catch(java.io.IOException e){throw new IllegalStateException("Could not prepare automatic report",e);}
     }
@@ -63,12 +63,12 @@ public record BugReportPayload(String build, String minecraftVersion, String des
             body.put("schemaVersion", 1); body.put("build", build); body.put("minecraftVersion", minecraftVersion);
             body.put("description", description); body.put("expected", expected); body.set("diagnostics", JSON.valueToTree(diagnostics));
             if (diagnosticLog != null && !diagnosticLog.isEmpty()) {
-                if (diagnosticLog.getBytes(StandardCharsets.UTF_8).length > BugReportLog.MAX_BYTES) throw new IllegalArgumentException("Filtered log exceeds 8 KiB");
+                if (diagnosticLog.getBytes(StandardCharsets.UTF_8).length > BugReportLog.MAX_BYTES) throw new IllegalArgumentException("Filtered log exceeds 24 KiB");
                 if (diagnosticLog.split("\n", -1).length > 200 || diagnosticLog.lines().anyMatch(line -> line.length() > 500)) throw new IllegalArgumentException("Filtered log exceeds receiver line limits");
                 body.put("schemaVersion", 2); body.put("diagnosticLog", diagnosticLog);
             }
             byte[] bytes = JSON.writeValueAsBytes(body);
-            int limit = diagnosticLog == null || diagnosticLog.isEmpty() ? 16384 : 32768;
+            int limit = diagnosticLog == null || diagnosticLog.isEmpty() ? 16384 : 65536;
             if (bytes.length > limit) throw new IllegalArgumentException("Report exceeds the receiver's size limit");
             return bytes;
         } catch (java.io.IOException e) { throw new IllegalStateException("Could not prepare report"); }

@@ -17,8 +17,8 @@ class AutomaticReportServiceTest {
     static Observation failure(){return new Observation(true,true,true,false,true,true,false,Signature.IMMUTABLE_POSITION_IDENTITY_CONFLICT);}
     static JsonNode caps() throws Exception {
         return JSON.readTree("""
-            {"schemaVersions":[1,2,3],"configured":true,"requiresAuthentication":false,"maxBodyBytes":32768,
-             "diagnosticLog":{"supported":true,"schemaVersion":2,"maxBytes":8192,"maxLines":200,"maxLineChars":500},
+            {"schemaVersions":[1,2,3],"configured":true,"requiresAuthentication":false,"maxBodyBytes":65536,
+             "diagnosticLog":{"supported":true,"schemaVersion":2,"maxBytes":24576,"maxLines":200,"maxLineChars":500},
              "automaticReports":{"supported":true,"grouped":true,"schemaVersion":3,"kinds":["DURABLE_WRITE_REJECTED","PERSISTENCE_WRITER_FAILED"]}}
             """);
     }

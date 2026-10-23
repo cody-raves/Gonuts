@@ -14,7 +14,7 @@ public final class AutomaticReportOutbox {
     public record Pending(String retryKey, String fingerprint, String body, long reservedAt, int attempts, long nextAttemptAt) {
         public Pending {
             if(retryKey==null || !retryKey.matches("[A-Za-z0-9_-]{8,64}") || fingerprint==null
-                || !fingerprint.matches("[a-f0-9]{64}") || body==null || body.getBytes(StandardCharsets.UTF_8).length>32768
+                || !fingerprint.matches("[a-f0-9]{64}") || body==null || body.getBytes(StandardCharsets.UTF_8).length>65536
                 || reservedAt<0 || attempts<0 || attempts>5 || nextAttemptAt<0)
                 throw new IllegalArgumentException("Invalid automatic outbox");
             validateBody(body,fingerprint);
@@ -47,15 +47,16 @@ public final class AutomaticReportOutbox {
     }
     /** Validate regenerated lines again after a restart; never trust a locally edited excerpt. */
     static boolean validExcerpt(String log) {
-        if(log.getBytes(StandardCharsets.UTF_8).length>8192||log.split("\n",-1).length>200)return false;
+        if(log.getBytes(StandardCharsets.UTF_8).length>BugReportLog.MAX_BYTES||log.split("\n",-1).length>200)return false;
         if(log.startsWith("Controller context (fixed keys, no identities)\n")||log.startsWith("Current controller evidence: unavailable\n"))return validContextExcerpt(log);
         String prefix=BugReportLog.sanitize("");
-        if(!log.startsWith(prefix) || log.getBytes(StandardCharsets.UTF_8).length>8192) return false;
+        if(!log.startsWith(prefix) || log.getBytes(StandardCharsets.UTF_8).length>BugReportLog.MAX_BYTES) return false;
         String events=log.substring(prefix.length());
         if(events.isEmpty()) return true;
         if(events.split("\n",-1).length>100) return false;
         for(String line:events.split("\n",-1)) {
             if(line.length()>500) return false;
+            if(DecisionTrace.valid(line))continue;
             if(line.startsWith("  at ")) {
                 if(!BugReportLog.sanitize(line).equals(prefix+line)) return false;
                 continue;
@@ -68,6 +69,7 @@ public final class AutomaticReportOutbox {
         var seen=new HashSet<String>();boolean action=false,history=false;
         for(String line:log.split("\n",-1)){
             if(line.length()>500)return false;
+            if(DecisionTrace.valid(line)||DecisionTrace.validCoverage(line))continue;
             if(line.isEmpty()||line.equals("Controller context (fixed keys, no identities)")||line.equals("Current controller evidence: unavailable"))continue;
             if(line.startsWith("ctx ")){if(history||!ReportContextLine.valid(line,seen))return false;continue;}
             if(line.equals("Action evidence v1 (newest per subsystem first; ages at capture; -1 unknown)")){if(action||history)return false;action=true;continue;}
@@ -80,6 +82,7 @@ public final class AutomaticReportOutbox {
     }
     private static boolean safeHistorical(String line) {
         String body=line.replaceFirst("^\\[\\d{2}:\\d{2}:\\d{2}\\] ","");
+        if(DecisionTrace.valid(body))return true;
         if(body.startsWith("act "))return body.equals(ActionTrace.sanitizedLogLine("GoNuts action "+body));
         if(body.matches("automation state=(SCANNING|BID_DESK|PREPARING_LIST|LISTING|MONITORING|COOLDOWN|PAUSED|STOPPED|IDLE|BUYING|REPRICING)( reason=[A-Z_]+)?")){
             int index=body.indexOf(" reason=");return index<0||ActionTrace.knownReason(body.substring(index+8));
@@ -89,7 +92,7 @@ public final class AutomaticReportOutbox {
     }
     public Optional<Pending> load(long now) throws IOException {
         if(!Files.exists(file)) return Optional.empty();
-        if(Files.size(file)>65536) throw new IOException("Automatic outbox too large");
+        if(Files.size(file)>131072) throw new IOException("Automatic outbox too large");
         try {
             Pending pending=JSON.readValue(Files.readAllBytes(file),Pending.class);
             if(pending.reservedAt()>now+300_000 || pending.nextAttemptAt()>now+86_700_000) throw new IOException("Invalid outbox chronology");

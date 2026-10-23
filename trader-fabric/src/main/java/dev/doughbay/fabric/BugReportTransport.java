@@ -27,7 +27,7 @@ public final class BugReportTransport {
     }
     /** Runs on the report daemon only. The caller validates its frozen outbox before calling. */
     public AutomaticResult sendAutomatic(byte[] frozenBody, String key) throws Exception {
-        if (frozenBody.length>32768 || key==null || !key.matches("[A-Za-z0-9_-]{8,64}"))
+        if (frozenBody.length>65536 || key==null || !key.matches("[A-Za-z0-9_-]{8,64}"))
             throw new IllegalArgumentException("Invalid automatic request");
         var request=HttpRequest.newBuilder(ENDPOINT).timeout(Duration.ofSeconds(25))
             .header("Content-Type","application/json").header("Idempotency-Key",key)
@@ -108,9 +108,9 @@ public final class BugReportTransport {
     }
     static boolean advertisesLogSupport(com.fasterxml.jackson.databind.JsonNode body) {
         var log = body.path("diagnosticLog");
-        if (!body.path("schemaVersions").isArray() || body.path("maxBodyBytes").asInt() < 32768
+        if (!body.path("schemaVersions").isArray() || body.path("maxBodyBytes").asInt() < 65536
             || !log.path("supported").asBoolean(false) || log.path("schemaVersion").asInt() != 2
-            || log.path("maxBytes").asInt() < 8192 || log.path("maxLines").asInt() < 102 || log.path("maxLineChars").asInt() < 500) return false;
+            || log.path("maxBytes").asInt() < BugReportLog.MAX_BYTES || log.path("maxLines").asInt() < 102 || log.path("maxLineChars").asInt() < 500) return false;
         for (var version : body.path("schemaVersions")) if (version.isIntegralNumber() && version.asInt() == 2) return true;
         return false;
     }
@@ -119,7 +119,7 @@ public final class BugReportTransport {
         var automatic=body.path("automaticReports");
         if(!body.path("configured").asBoolean(false) || body.path("requiresAuthentication").asBoolean(true)
                 || !automatic.path("supported").asBoolean(false) || !automatic.path("grouped").asBoolean(false)
-                || automatic.path("schemaVersion").asInt()!=3 || body.path("maxBodyBytes").asInt()<32768
+                || automatic.path("schemaVersion").asInt()!=3 || body.path("maxBodyBytes").asInt()<65536
                 || !body.path("schemaVersions").isArray() || !automatic.path("kinds").isArray())return false;
         boolean schema=false, supportedKind=false;
         for(var version:body.path("schemaVersions")) if(version.isIntegralNumber()&&version.asInt()==3)schema=true;

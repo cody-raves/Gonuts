@@ -24,7 +24,7 @@ public enum SettingsSection {
         if(!original.equals("Orders"))return original.equals("Underdog")?"Rival orders":original;
         if(java.util.Set.of("orders.enabled","orders.scan_min","orders.full_sweep_min","orders.pages","orders.one_trip","upload.enabled").contains(key))return "Read the order book";
         if(java.util.Set.of("orders.bid","orders.bid_slots","orders.bid_min_room","quiet.bid_boost").contains(key))return "Place buy orders";
-        if(key.startsWith("orders.reserve_")||java.util.Set.of("orders.bid_stacks","orders.depth_share_pct","orders.size_by_sale").contains(key))return "Order size & stock";
+        if(key.startsWith("orders.reserve_")||java.util.Set.of("orders.bid_stacks","orders.fixed_batch","orders.depth_share_pct","orders.size_by_sale").contains(key))return "Order size & stock";
         if(key.startsWith("orders.chase")||key.equals("orders.nofill_min"))return "Re-check existing bids";
         if(key.startsWith("orders.collect")||java.util.Set.of("orders.deliver","orders.source","orders.max_targets").contains(key)||key.startsWith("inventory."))return "Fills & delivery";
         return "Order price & evidence";

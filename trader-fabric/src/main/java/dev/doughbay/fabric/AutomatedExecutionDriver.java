@@ -1179,11 +1179,15 @@ public final class AutomatedExecutionDriver implements ExecutionDriver {
         for (String raw : tooltipLines(client, stack)) {
             String line = raw.strip();
             Matcher req = OWN_REQUESTED.matcher(line);
-            if (req.find()) requested = (int) parseAbbreviated(req.group(1).replace(" ", ""));
+            if (req.find()) requested = OwnOrderQuantity.exact(req.group(1).replace(" ", "")).orElse(-1);
             Matcher price = ORDER_PRICE.matcher(line);
             if (price.find()) unit = parseAbbreviated(price.group(1) + price.group(2));
             Matcher done = ORDER_DELIVERED.matcher(line);
-            if (done.find()) delivered = parseAbbreviated(done.group(1));
+            if (done.find()) {
+                var exactDelivered = OwnOrderQuantity.exact(done.group(1));
+                if (exactDelivered.isEmpty()) return null;
+                delivered = exactDelivered.getAsInt();
+            }
             if (OWN_CANCELLED.matcher(line).find()) cancelled = true;
             Matcher exp = OWN_EXPIRES.matcher(line);
             if (exp.find()) {
@@ -1360,8 +1364,6 @@ public final class AutomatedExecutionDriver implements ExecutionDriver {
                     continue;
                 }
                 rows.add(row);
-                if(multipleOwnOrders() && row.requested()>=1000)
-                    unparsed.add("Native order quantity exceeds exact-count support");
                 if (matchesOwnOrder(row, targetItemId, ownTargetUnitPrice, ownMatchRequested,
                         operation == Operation.CANCEL_ORDER)
                         && (operation != Operation.COLLECT_ORDER || collectionReady(row,collectFinishedOnly))) {

@@ -334,6 +334,7 @@ public final class SettingsCode {
             "orders.max_per_market",
             "orders.depth_share_pct",
             "orders.bid_stacks",
+            "orders.fixed_batch",
             "upload.enabled",
             "orders.bid_min_confidence",
             "orders.bid_min_samples",

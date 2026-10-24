@@ -87,6 +87,8 @@ final class NativeOrderEvidence {
                     Map<String,Object> row=new LinkedHashMap<>();
                     row.put("slot",i);row.put("item",BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
                     row.put("requestedDisplay",quantity);if(delivered!=null)row.put("deliveredDisplay",delivered);
+                    row.put("requestedExact",OwnOrderQuantity.exact(quantity).isPresent());
+                    if(delivered!=null) row.put("deliveredExact",OwnOrderQuantity.exact(delivered.split("/",2)[0]).isPresent());
                     var custom=stack.get(DataComponents.CUSTOM_DATA);
                     row.put("customNumericSchema",custom==null?Map.of():numericSchema(custom.copyTag()));
                     if(custom!=null)row.put("opaqueRowFingerprint",opaqueRowFingerprint(custom.copyTag()));

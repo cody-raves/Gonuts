@@ -865,6 +865,12 @@ public final class Tuning {
             new Setting("orders.bid_stacks", "Orders", "Stacks per bid",
                     "The most stacks one bid may ask for. Each order is sized under this from the market's "
                     + "margin, its daily volume, and how fast our own recent stacks of it sold", 3, 1, 30, Kind.COUNT),
+            new Setting("orders.fixed_batch", "Orders", "Require the full bid batch",
+                    "Require exactly Stacks per bid in each new automatic whole-stack order. Wait instead of "
+                    + "shrinking when depth, listing room, spending or quantity recognition cannot support the full batch. "
+                    + "Keeps all price and safety checks. Off preserves adaptive sizing. "
+                    + "Current native quantity recognition is limited to 999 items; larger fixed batches wait",
+                    0, 0, 1, Kind.TOGGLE),
             new Setting("upload.enabled", "Orders", "Send order sweeps home",
                     "Post every order-house sweep to the DoughBay API so it can serve an order book the public "
                     + "feed does not have. Needs the API's ingest route (1 on, 0 off)", 0, 0, 1, Kind.TOGGLE),

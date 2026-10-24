@@ -6419,7 +6419,8 @@ public final class AutomationSessionController {
             dev.doughbay.fabric.BidSizer.Track track = stackTrack.get(m.itemKey());
             // The stack side of a market that prefers singles is its thin
             // side, so a few stacks at a time until that has been watched.
-            int sized = shaped == OrderShape.Mode.STACKS
+            boolean fixedBatch = dev.doughbay.fabric.Tuning.get("orders.fixed_batch") >= 0.5;
+            int sized = fixedBatch ? stacks : shaped == OrderShape.Mode.STACKS
                     ? Math.min(SHAPED_MAX_STACKS, dev.doughbay.fabric.BidSizer.stacks(stacks, depthStacks, margin, track))
                     : retail != null || shaped == OrderShape.Mode.SINGLES ? 1
                     : dev.doughbay.fabric.BidSizer.stacks(stacks, depthStacks, margin, track);
@@ -6431,7 +6432,15 @@ public final class AutomationSessionController {
             // in hand still counts against it.
             int roomInMarket = Math.max(MAX_OPEN_PER_MARKET(), sized) - openOfMarket(m.itemKey(), per);
             int count;
-            if (shaped == OrderShape.Mode.SINGLES) {
+            if (fixedBatch) {
+                var fixed = FixedOrderBatch.plan(stacks, full, per, depthStacks, sharePct < 100,
+                        roomInMarket, unit, (long)Math.min(effectivePurchaseCap(), room), 999);
+                if (fixed.gate() != FixedOrderBatch.Gate.READY) {
+                    bump(why, "full fixed batch waits: " + fixed.gate().name().toLowerCase(java.util.Locale.ROOT));
+                    continue;
+                }
+                count = fixed.units();
+            } else if (shaped == OrderShape.Mode.SINGLES) {
                 // The single allotment, whole, once enough of the last one has
                 // sold to take it: never three of something because three
                 // slots happened to be free.
@@ -6462,6 +6471,9 @@ public final class AutomationSessionController {
                 }
                 var reserveBook = ReserveStock.book(m.itemKey(),ownOrders,collectedByKey);
                 int requestedStacks = Math.min(stacks,(int)dev.doughbay.fabric.Tuning.get("orders.reserve_stacks"));
+                if (fixedBatch && requestedStacks != stacks) {
+                    bump(why,"full fixed batch exceeds reserve batch setting"); continue;
+                }
                 count = ReserveStock.batchUnits(requestedStacks,full,unit,
                         (long)Math.min(effectivePurchaseCap(),room),
                         sharePct >= 100 ? -1 : (long)depthStacks*per,
@@ -6471,13 +6483,13 @@ public final class AutomationSessionController {
                 }
             }
             String quantityKind = full > 1 && per == full ? "stack(s)" : "item(s)";
-            String trimmed = String.format(java.util.Locale.ROOT, "; %d of up to %d %s, margin %.0f%%%s%s",
+            String trimmed = String.format(java.util.Locale.ROOT, fixedBatch ? "; %d of exactly %d %s, margin %.0f%%%s%s" : "; %d of up to %d %s, margin %.0f%%%s%s",
                     count / per, stacks, quantityKind, margin * 100,
-                    track == null ? ", unproven" : String.format(java.util.Locale.ROOT, ", ours sold %d in ~%.0f min",
+                    fixedBatch ? ", fixed batch" : track == null ? ", unproven" : String.format(java.util.Locale.ROOT, ", ours sold %d in ~%.0f min",
                             track.sold(), track.avgMinutesListed()),
                     roomInMarket < sized ? ", listing cap" : "");
             dev.doughbay.fabric.DecisionTrace.INSTANCE.record(dev.doughbay.fabric.ActionTrace.Scope.DESK,dev.doughbay.fabric.ActionTrace.Event.OBSERVATION,dev.doughbay.fabric.DecisionTrace.Code.ORDER_DEPTH,dev.doughbay.fabric.DecisionTrace.Reason.DEPTH_CAP,m.itemKey(),stacks,depthStacks,unit,room,now);
-            dev.doughbay.fabric.DecisionTrace.INSTANCE.record(dev.doughbay.fabric.ActionTrace.Scope.DESK,dev.doughbay.fabric.ActionTrace.Event.OBSERVATION,dev.doughbay.fabric.DecisionTrace.Code.ORDER_SALES,dev.doughbay.fabric.DecisionTrace.Reason.ADAPTIVE_BATCH,m.itemKey(),stacks,sized,track == null ? -1 : track.sold(),roomInMarket,now);
+            dev.doughbay.fabric.DecisionTrace.INSTANCE.record(dev.doughbay.fabric.ActionTrace.Scope.DESK,dev.doughbay.fabric.ActionTrace.Event.OBSERVATION,dev.doughbay.fabric.DecisionTrace.Code.ORDER_SALES,fixedBatch ? dev.doughbay.fabric.DecisionTrace.Reason.STACK_BATCH : dev.doughbay.fabric.DecisionTrace.Reason.ADAPTIVE_BATCH,m.itemKey(),stacks,sized,track == null ? -1 : track.sold(),roomInMarket,now);
             long cost = unit * count;
             if (multipleOrderMarket(m.itemKey()) && !reserveMarket(m.itemKey())) {
                 long depth=sharePct>=100 ? -1 : (long)depthStacks*per;
@@ -6490,7 +6502,8 @@ public final class AutomationSessionController {
             if (cost > effectivePurchaseCap()) { bump(why, "over the buy cap"); continue; }
             if (cost > room) { bump(why, "no room left"); continue; }
             dev.doughbay.fabric.DecisionTrace.INSTANCE.record(dev.doughbay.fabric.ActionTrace.Scope.DESK,dev.doughbay.fabric.ActionTrace.Event.REQUEST,dev.doughbay.fabric.DecisionTrace.Code.ORDER_PLAN,
-                    shaped == OrderShape.Mode.SINGLES ? dev.doughbay.fabric.DecisionTrace.Reason.SINGLE_ALLOTMENT
+                    fixedBatch ? dev.doughbay.fabric.DecisionTrace.Reason.STACK_BATCH
+                    : shaped == OrderShape.Mode.SINGLES ? dev.doughbay.fabric.DecisionTrace.Reason.SINGLE_ALLOTMENT
                     : shaped == OrderShape.Mode.STACKS ? dev.doughbay.fabric.DecisionTrace.Reason.STACK_BATCH
                     : retail != null ? dev.doughbay.fabric.DecisionTrace.Reason.RETAIL_BATCH : dev.doughbay.fabric.DecisionTrace.Reason.ADAPTIVE_BATCH,
                     m.itemKey(),(long)stacks*full,count,unit,(long)Math.min(effectivePurchaseCap(),room),now);

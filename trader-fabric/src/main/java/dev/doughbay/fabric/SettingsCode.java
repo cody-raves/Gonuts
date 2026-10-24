@@ -384,6 +384,7 @@ public final class SettingsCode {
             if (root == null || !root.isObject() || root.size() != 3 || !root.path("v").isIntegralNumber()
                     || root.path("v").asInt() != 1 || !root.path("n").isObject()
                     || !root.path("t").isObject() || root.path("t").size() != 0) throw new IllegalArgumentException();
+            if (!validFixedBatch(root.path("n").get("orders.fixed_batch"))) throw new IllegalArgumentException();
             var fields = root.path("n").fields();
             while (fields.hasNext()) {
                 var field = fields.next();
@@ -394,6 +395,11 @@ public final class SettingsCode {
     }
 
     /** The code for a settings document. */
+    private static boolean validFixedBatch(JsonNode value) {
+        return value == null || value.isNumber() && Double.isFinite(value.asDouble())
+                && (value.asDouble() == 0 || value.asDouble() == 1);
+    }
+
     static String encode(byte[] json) throws java.io.IOException {
         return PREFIX + "-" + group(base32Encode(gzip(json)));
     }
@@ -420,6 +426,8 @@ public final class SettingsCode {
             return Result.failed("code is corrupt");
         }
         if (root == null || !root.hasNonNull("v")) return Result.failed("not a settings code");
+        if (!validFixedBatch(root.path("n").get("orders.fixed_batch")))
+            return Result.failed("Require the full bid batch must be 0 or 1");
 
         // Saved presets use this same importer. Old codes must not silently
         // discard their only selection or recreate a hidden purchase filter.

@@ -44,6 +44,7 @@ public final class Tuning {
         }
 
         public double clamp(double value) {
+            if (key.equals("orders.fixed_batch") && value != 0 && value != 1) return defaultValue;
             if (Double.isNaN(value)) return defaultValue;
             return Math.max(min, Math.min(max, value));
         }

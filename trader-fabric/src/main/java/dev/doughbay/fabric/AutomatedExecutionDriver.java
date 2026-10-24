@@ -1209,6 +1209,7 @@ public final class AutomatedExecutionDriver implements ExecutionDriver {
         Inventory inventory = client.player.getInventory();
         String title = container.getTitle().getString().toLowerCase(Locale.ROOT);
         if (ticksInPhase < ownSettleUntilTick) return;
+        NativeOrderEvidence.captureDetailIfRequested(client,container);
         if (shouldReopenOwnOrdersNavigation(title)) {
             ownNavigationReopens++;
             DoughBayClient.LOGGER.info("DoughBay: Your Orders navigation stalled at stage {} on {}; "

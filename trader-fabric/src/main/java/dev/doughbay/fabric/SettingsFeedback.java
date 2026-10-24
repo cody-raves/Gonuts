@@ -47,7 +47,11 @@ public final class SettingsFeedback {
                 "Ordinary history-based bids need "+Math.round(n.getOrDefault("orders.bid_min_samples",6d))+" price observations. The early real-trade fallback is off; supported retail pricing paths can still qualify. Markets without enough evidence may wait, especially on a new client.","orders.bid_min_samples","orders.bid_on_real_trades");
             if(n.getOrDefault("orders.depth_share_pct",100d)<=5)add(out,"depth-sizing","info","Market depth can reduce or block a batch",
                 "Each bid is limited to 5% or less of observed daily volume. Thin whole-stack markets can be skipped. Stacks per bid is a maximum, not a promised batch size.","orders.depth_share_pct","orders.bid_stacks");
-            if(n.getOrDefault("orders.bid_stacks",3d)>15)add(out,"exact-count","info","64-item stacks are capped below 1,000 units",
+            if(on(n,"orders.fixed_batch"))add(out,"fixed-batch","info","The whole batch must fit",
+                "New automatic whole-stack bids wait instead of shrinking when the requested batch cannot fit quantity recognition, market depth, listing room or spending limits. Price and ownership guards still apply.","orders.fixed_batch","orders.bid_stacks");
+            if(on(n,"orders.fixed_batch")&&n.getOrDefault("orders.bid_stacks",3d)>15)add(out,"exact-count","warning","A 16-stack ordinary batch still waits for quantity support",
+                "16 stacks of 64 items require 1,024. This draft retains the 999-item recognition guard and does not substitute a smaller batch. Do not enable it for 16 ordinary stacks until the full native placement and collection path is verified.","orders.fixed_batch","orders.bid_stacks");
+            if(!on(n,"orders.fixed_batch")&&n.getOrDefault("orders.bid_stacks",3d)>15)add(out,"exact-count","info","64-item stacks are capped below 1,000 units",
                 "The order house abbreviates larger quantities. Ordinary 64-item stack bids are capped at 15 stacks so their exact quantities remain recognizable; other limits may reduce them further.","orders.bid_stacks");
         }
         if(!on(n,"orders.collect")){

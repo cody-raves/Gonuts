@@ -1,0 +1,18 @@
+plugins { id 'net.fabricmc.fabric-loom' version "${loom_version}" }
+version = "0.1.0+${project.minecraft_version}"
+base { archivesName = 'gonuts-trading-sandbox' }
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
+tasks.withType(JavaCompile).configureEach { options.release = 25 }
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand 'version': project.version }
+}
+loom.runs.client {
+    runDir = System.getenv('LOCALAPPDATA') + '/GoNuts/offline-trading-sandbox-run'
+    programArgs '--username', 'SandboxTester'
+}

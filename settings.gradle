@@ -23,3 +23,6 @@ include 'trader-cli'
 //   ./gradlew :trader-cli:build
 include 'trader-fabric'
 include 'trader-server'
+
+// Local test venue only; never part of a normal production/client release.
+if (providers.gradleProperty('tradingSandbox').isPresent()) include 'trader-sandbox'

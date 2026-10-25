@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "gonuts_trading_sandbox",
+  "version": "${version}",
+  "name": "GoNuts Offline Trading Sandbox",
+  "description": "Single-player synthetic order house, auctions, scoreboard and follows. Fake money and test-world storage only.",
+  "environment": "*",
+  "entrypoints": {"main": ["dev.doughbay.sandbox.TradingSandboxMod"]},
+  "depends": {"fabricloader": ">=0.16.0", "minecraft": "~26.2", "java": ">=25", "fabric-api": "*"},
+  "license": "MIT"
+}

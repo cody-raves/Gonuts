@@ -1732,6 +1732,24 @@ public final class AutomatedExecutionDriver implements ExecutionDriver {
     private String placeReceipt = "";
     private int placeMatchingBefore = -1;
     private static final Pattern PLACE_RECEIPT = Pattern.compile("(?i)^you ordered +([0-9,]+) +(.+)$");
+
+    static java.util.OptionalInt placementReceiptQuantity(String text, String displayName) {
+        if (text == null || displayName == null || displayName.isBlank()) return java.util.OptionalInt.empty();
+        Matcher receipt = PLACE_RECEIPT.matcher(text.strip());
+        if (!receipt.matches()) return java.util.OptionalInt.empty();
+        String item = placementItemName(receipt.group(2));
+        String expected = placementItemName(displayName);
+        if (!item.equals(expected)) return java.util.OptionalInt.empty();
+        var quantity = OwnOrderQuantity.exact(receipt.group(1));
+        return quantity.isPresent() && quantity.getAsInt() > 0 ? quantity : java.util.OptionalInt.empty();
+    }
+
+    private static String placementItemName(String name) {
+        // Native receipts pluralize within names: "Blocks of Diamond", "Bottles o' Enchanting".
+        return java.util.Arrays.stream(name.strip().toLowerCase(Locale.ROOT).split("\\s+"))
+                .map(word -> word.endsWith("s") && word.length() > 1 ? word.substring(0, word.length()-1) : word)
+                .collect(java.util.stream.Collectors.joining(" "));
+    }
     private boolean ownDone;
 
     /**
@@ -4926,8 +4944,12 @@ public final class AutomatedExecutionDriver implements ExecutionDriver {
             lastDeliveryReceiptAt = System.currentTimeMillis();
             if (operation == Operation.DELIVER) deliverReceipt = text.strip();
         }
-        if (operation == Operation.PLACE_ORDER && placeConfirmed && PLACE_RECEIPT.matcher(text.strip()).find()) {
-            placeReceipt = text.strip();
+        if (operation == Operation.PLACE_ORDER && placeConfirmed) {
+            var accepted = placementReceiptQuantity(text, placeDisplayName);
+            if (accepted.isPresent()) {
+                placeReceipt = text.strip();
+                targetCount = accepted.getAsInt();
+            }
         }
         Matcher wait = COMMAND_WAIT.matcher(text.strip());
         if (wait.matches() && isActive() && phase != Phase.WAITING_FOR_COMPLETION
@@ -5360,9 +5382,9 @@ public final class AutomatedExecutionDriver implements ExecutionDriver {
         if (operation == Operation.PLACE_ORDER && placeConfirmed && !placeReceipt.isEmpty()) {
             // On the receipt, not on the click: the alert says what the order
             // house accepted, which is the only version worth showing.
-            DoughBayClient.alertOrderPlaced(shortName(targetItemId), placeCount, placeUnitPrice);
+            DoughBayClient.alertOrderPlaced(shortName(targetItemId), targetCount, placeUnitPrice);
             complete(client, String.format(Locale.ROOT, "Bid placed: %s x%d at %s each (%s)",
-                    shortName(targetItemId), placeCount, money(placeUnitPrice), placeReceipt));
+                    shortName(targetItemId), targetCount, money(placeUnitPrice), placeReceipt));
             return;
         }
         if (operation == Operation.DELIVER && deliverStage == 6 && !deliverReceipt.isEmpty()) {

@@ -4400,11 +4400,10 @@ public final class AutomationSessionController {
         return itemId + "|" + unitPrice + "|" + requested;
     }
 
-    /** A bid the desk placed: what it pays per item, for booking a fill that reaches the inventory by any route. */
-    private record PlacedBid(String itemId, long unitPrice, int count, long placedAt) {}
     /** A fill the server announced ("shade515 delivered you 64 Empty Maps") that has not been booked yet. */
     private record Fill(String itemName, int count, long at) {}
-    private final java.util.Map<String, PlacedBid> placedBids = new java.util.LinkedHashMap<>();
+    private final AcceptedOrders placedBids = new AcceptedOrders();
+    private boolean acceptedOrdersReady;
     private final List<Fill> pendingFills = new ArrayList<>();
     private final java.util.Map<String, Long> fillNoteAt = new java.util.HashMap<>();
 
@@ -4436,32 +4435,27 @@ public final class AutomationSessionController {
     }
 
     private void saveBidsAndFills() {
-        if (collectedStore == null) return;
+        if (collectedStore == null || !acceptedOrdersReady) return;
         try {
-            List<String> bids = new ArrayList<>();
-            for (PlacedBid b : placedBids.values()) bids.add(b.itemId() + "|" + b.unitPrice() + "|" + b.count() + "|" + b.placedAt());
-            java.nio.file.Files.write(collectedStore.resolveSibling("orders-bids.txt"), bids);
+            placedBids.save(collectedStore.resolveSibling("orders-accepted.txt"));
             List<String> fills = new ArrayList<>();
             for (Fill f : pendingFills) fills.add(f.itemName() + "|" + f.count() + "|" + f.at());
             java.nio.file.Files.write(collectedStore.resolveSibling("orders-fills.txt"), fills);
         } catch (Exception e) {
-            LOGGER.warn("DoughBay could not save the bids and fills record: {}", e.toString());
+            acceptedOrdersReady = false;
+            LOGGER.warn("DoughBay could not save the bids and fills record; new bids blocked: {}", e.toString());
         }
     }
 
     private void loadBidsAndFills() {
+        acceptedOrdersReady = false;
         placedBids.clear();
         pendingFills.clear();
         if (collectedStore == null) return;
         try {
-            java.nio.file.Path bids = collectedStore.resolveSibling("orders-bids.txt");
-            if (java.nio.file.Files.exists(bids)) {
-                for (String line : java.nio.file.Files.readAllLines(bids)) {
-                    String[] p = line.strip().split("[|]");
-                    if (p.length < 4) continue;
-                    placedBids.put(p[0], new PlacedBid(p[0], Long.parseLong(p[1]), Integer.parseInt(p[2]), Long.parseLong(p[3])));
-                }
-            }
+            java.nio.file.Path bids = collectedStore.resolveSibling("orders-accepted.txt");
+            if (!java.nio.file.Files.exists(bids)) bids = collectedStore.resolveSibling("orders-bids.txt");
+            placedBids.load(bids);
             java.nio.file.Path fills = collectedStore.resolveSibling("orders-fills.txt");
             if (java.nio.file.Files.exists(fills)) {
                 for (String line : java.nio.file.Files.readAllLines(fills)) {
@@ -4473,6 +4467,7 @@ public final class AutomationSessionController {
                     pendingFills.add(new Fill(name, Integer.parseInt(p[1]), Long.parseLong(p[2])));
                 }
             }
+            acceptedOrdersReady = true;
             if (!pendingFills.isEmpty()) LOGGER.info("DoughBay bid desk: {} fill(s) from earlier still to book", pendingFills.size());
         } catch (Exception e) {
             LOGGER.warn("DoughBay could not read the bids and fills record: {}", e.toString());
@@ -4480,9 +4475,10 @@ public final class AutomationSessionController {
     }
 
     /** The bid that a fill notice belongs to, by the item's display name; null when no bid of ours matches. */
-    private PlacedBid bidForFill(Fill f) {
-        for (PlacedBid b : placedBids.values()) {
-            if (noticeNames(f.itemName(), AutomatedExecutionDriver.displayNameFor(b.itemId()))) return b;
+    private AcceptedOrders.Bid bidForFill(Fill f) {
+        for (AcceptedOrders.Bid b : placedBids.values()) {
+            if (noticeNames(f.itemName(), AutomatedExecutionDriver.displayNameFor(b.itemId())))
+                return placedBids.unambiguousItem(b.itemId());
         }
         return null;
     }
@@ -4517,10 +4513,10 @@ public final class AutomationSessionController {
         // arrive as one merged stack, so a stack is booked when its count
         // fits inside what the notices for that item add up to.
         java.util.Map<String, Integer> owed = new java.util.LinkedHashMap<>();
-        java.util.Map<String, PlacedBid> bids = new java.util.HashMap<>();
+        java.util.Map<String, AcceptedOrders.Bid> bids = new java.util.HashMap<>();
         // A copy: stale entries are dropped inside the loop.
         for (Fill f : new ArrayList<>(pendingFills)) {
-            PlacedBid bid = bidForFill(f);
+            AcceptedOrders.Bid bid = bidForFill(f);
             if (bid == null) {
                 // Nothing of ours explains it: somebody delivered to an order
                 // we never placed, or the record was lost. Say so once, then
@@ -4569,7 +4565,7 @@ public final class AutomationSessionController {
                 // Notices can arrive after collection and cover only part of a
                 // physical stack. The rest of the stack is not free inventory.
                 int count = stacks.get(larger).getCount();
-                PlacedBid bid = bids.get(itemId);
+                AcceptedOrders.Bid bid = bids.get(itemId);
                 LOGGER.info("DoughBay bid desk: {} x{} in the inventory against fills of {}; listing the stack with full estimated cost {} ({} notices)",
                         itemId, count, sum, CollectedCost.fullStack(count, bid.unitPrice()), sum);
                 consumeFills(itemId, sum);
@@ -4602,7 +4598,7 @@ public final class AutomationSessionController {
                 continue;
             }
             int count = stacks.get(best).getCount();
-            PlacedBid bid = bids.get(itemId);
+            AcceptedOrders.Bid bid = bids.get(itemId);
             LOGGER.info("DoughBay bid desk: {} x{} from fills is in the inventory and no order still owes it; booking at {} each",
                     itemId, count, bid.unitPrice());
             consumeFills(itemId, count);
@@ -4615,7 +4611,9 @@ public final class AutomationSessionController {
         boolean trace = now - fillNoteAt.getOrDefault("#trace", 0L) > 60_000;
         if (trace) fillNoteAt.put("#trace", now);
         List<String> traceLines = new ArrayList<>();
-        for (PlacedBid bid : placedBids.values()) {
+        for (AcceptedOrders.Bid bid : placedBids.values()) {
+            // An item-only inventory fallback cannot select between different accepted costs.
+            if (placedBids.unambiguousItem(bid.itemId()) == null) continue;
             if (inventoryStockAlreadyOwned(bid.itemId())) continue;
             if (now - bid.placedAt() > 24 * 3_600_000L) continue;
             int held = 0;
@@ -4739,7 +4737,7 @@ public final class AutomationSessionController {
     private Long strayUnitCost(String id) {
         Long recent = recentTradeUnitCost.get(id);
         if (recent != null) return recent;
-        PlacedBid bid = placedBids.get(id);
+        AcceptedOrders.Bid bid = placedBids.unambiguousItem(id);
         if (bid != null && bid.unitPrice() > 0) return bid.unitPrice();
         for (AutomatedExecutionDriver.OwnOrderRow r : ownOrders) {
             if (r.itemId().equals(id) && r.unitPrice() > 0) return r.unitPrice();
@@ -5161,7 +5159,7 @@ public final class AutomationSessionController {
         for (Position p : openListings) {
             if (p.itemKey().indexOf('#') < 0) targets.putIfAbsent(baseItemId(p.itemKey()) + "x" + p.quantity(), p.quantity());
         }
-        for (String item : placedBids.keySet()) {
+        for (String item : placedBids.itemIds()) {
             if (item.indexOf('#') < 0) targets.putIfAbsent(item + "x" + fullStack(item), fullStack(item));
         }
         if (snapshot != null) {
@@ -5353,6 +5351,10 @@ public final class AutomationSessionController {
             return true;
         }
         DeskStep step = deskQueue.pollFirst();
+        if (step.action() == DeskAction.PLACE && !acceptedOrdersReady) {
+            pauseInternal("Accepted order records are unavailable; no new bid sent");
+            return true;
+        }
         if(communityGuidanceEnabled()&&step.action()==DeskAction.PLACE) {
             boolean ownFresh=ownOrdersReadAt>0&&now-ownOrdersReadAt<=60000;
             boolean quoteFresh=dev.doughbay.fabric.hosted.CommunityDiscoveryGate.quoteFresh(orderQuotes.get(step.itemId()),
@@ -5634,6 +5636,11 @@ public final class AutomationSessionController {
                     deskQueue.removeIf(q->q.action()==DeskAction.PLACE);
                     break; // No order was created and no money was charged.
                 }
+                int acceptedCount = event.itemCount();
+                if (acceptedCount <= 0) {
+                    pauseInternal("Order acceptance had no exact quantity; reconciliation required");
+                    return;
+                }
                 deskSettleUntilMillis = now + 900;
                 deskPlaceFailures = 0;   // a placement that worked ends the run of failures
                 // A later item's quote can replan the whole batch. It must see
@@ -5641,7 +5648,7 @@ public final class AutomationSessionController {
                 // placement. Only a verified post-placement page refreshes the
                 // book; a receipt alone requires another native read.
                 var placedBook = driver.lastPlacementOrders();
-                dev.doughbay.fabric.OrderMetrics.placed(step.itemId(), step.unitPrice(), step.count());
+                dev.doughbay.fabric.OrderMetrics.placed(step.itemId(), step.unitPrice(), acceptedCount);
                 if (placedBook != null) {
                     ownOrders = placedBook;
                     ownOrdersReadAt = now;
@@ -5651,7 +5658,8 @@ public final class AutomationSessionController {
                     deskReadDue = true;
                 }
                 bidPlacedAt.put(new BidKey(step.itemId(), step.unitPrice()), now);
-                placedBids.put(step.itemId(), new PlacedBid(step.itemId(), step.unitPrice(), step.count(), now));
+                placedBids.remember(new AcceptedOrders.Bid(java.util.UUID.randomUUID().toString(),
+                        step.itemId(), step.unitPrice(), acceptedCount, now));
                 saveBidsAndFills();
                 if (reserveMarket(step.itemId()) || multipleOrderMarket(step.itemId())) {
                     ownOrdersReadAt = 0;
@@ -5661,8 +5669,16 @@ public final class AutomationSessionController {
                 // The order house has taken the whole price of the order. The
                 // slot check has to know, or it reads the fall in the bank as
                 // sales that never happened.
-                spentSinceAudit += step.unitPrice() * Math.max(0, step.count());
-                LOGGER.info("DoughBay bid desk: bid placed for {} x{} at {} each", step.itemId(), step.count(), step.unitPrice());
+                spentSinceAudit += step.unitPrice() * acceptedCount;
+                LOGGER.info("DoughBay bid desk: bid placed for {} x{} at {} each", step.itemId(), acceptedCount, step.unitPrice());
+                if (acceptedCount != step.count()) {
+                    pauseInternal("Server accepted a different order quantity; exact receipt saved for reconciliation");
+                    return;
+                }
+                if (!acceptedOrdersReady) {
+                    pauseInternal("Accepted order could not be saved; stock and spending retained for reconciliation");
+                    return;
+                }
             }
             case CANCEL -> {
                 // And it gives back what was not delivered. Taken from the
@@ -5673,9 +5689,7 @@ public final class AutomationSessionController {
                 long matching=ownOrders.stream().filter(r->r.itemId().equals(step.itemId())
                         &&r.unitPrice()==step.unitPrice()&&!r.alreadyCancelled()&&r.remaining()>0).count();
                 if(matching<=1) bidPlacedAt.remove(new BidKey(step.itemId(), step.unitPrice()));
-                PlacedBid placed = placedBids.get(step.itemId());
-                if (matching<=1 && placed != null && placed.unitPrice() == step.unitPrice()) {
-                    placedBids.remove(step.itemId());
+                if (matching<=1 && placedBids.cancelUnique(step.itemId(), step.unitPrice(), step.count(), now)) {
                     saveBidsAndFills();
                 }
                 LOGGER.info("DoughBay bid desk: bid cancelled: {} at {} each ({})", step.itemId(), step.unitPrice(), step.why());
@@ -5849,7 +5863,7 @@ public final class AutomationSessionController {
         java.util.Set<String> collectQueued = new java.util.HashSet<>();
         java.util.Map<String, Integer> fillSum = new java.util.HashMap<>();
         for (Fill f : pendingFills) {
-            PlacedBid b = bidForFill(f);
+            AcceptedOrders.Bid b = bidForFill(f);
             if (b != null) {
                 bidItems.add(b.itemId());
                 fillSum.merge(b.itemId(), f.count(), Integer::sum);
@@ -5955,7 +5969,7 @@ public final class AutomationSessionController {
                 // to the last coin. Where we placed the order ourselves we
                 // know what it is really at; otherwise the page is believed
                 // as far as it goes.
-                PlacedBid ours = placedBids.get(r.itemId());
+                AcceptedOrders.Bid ours = placedBids.matching(r.itemId(), r.unitPrice(), r.requested());
                 boolean thisIsOurs = ours != null && dev.doughbay.fabric.OwnPrices.shownAs(r.unitPrice(), ours.unitPrice());
                 if (!priced.top()) {
                     boolean atTheirPrice = thisIsOurs ? ours.unitPrice() == priced.buy()
@@ -8512,7 +8526,7 @@ public final class AutomationSessionController {
             if (isolatedOrderCycle==0) {
                 var managed=new java.util.HashSet<String>();
                 var items=new java.util.HashSet<String>(dev.doughbay.fabric.Tuning.itemSet("watch.tracked"));
-                items.addAll(placedBids.keySet());
+                items.addAll(placedBids.itemIds());
                 for (Position position:openListings) items.add(baseItemId(position.itemKey()));
                 for (String entry:items) {
                     String item=entry.contains(":")?entry:"minecraft:"+entry;
@@ -8969,7 +8983,7 @@ public final class AutomationSessionController {
         if(full){
             var managed=new java.util.HashSet<String>();
             var items=new java.util.HashSet<String>(dev.doughbay.fabric.Tuning.itemSet("watch.tracked"));
-            items.addAll(placedBids.keySet());for(Position position:openListings)items.add(baseItemId(position.itemKey()));
+            items.addAll(placedBids.itemIds());for(Position position:openListings)items.add(baseItemId(position.itemKey()));
             for(String entry:items){String item=entry.indexOf(':')>=0?entry:"minecraft:"+entry;
                 try{managed.add(dev.doughbay.fabric.hosted.CommunityWire.key(item,fullStack(item)));}catch(IllegalArgumentException ignored){}}
             int ownCount=(int)ownOrders.stream().filter(row->row.remaining()>0&&!row.alreadyCancelled()).count();

@@ -105,6 +105,8 @@ public final class Follows {
     /** Lower-cased name to what the server answered: FOLLOWED, NOT_FOUND, NO_REPLY. */
     private final Map<String, String> state = new LinkedHashMap<>();
     private final ArrayDeque<String> retries = new ArrayDeque<>();
+    /** Local policy refusals, distinct from anything the server confirmed. */
+    private final java.util.Set<String> commandRefused = new java.util.HashSet<>();
     /** An explicit button request takes precedence over automatic counterparties. */
     private final java.util.LinkedHashSet<String> requestedBots = new java.util.LinkedHashSet<>();
     /** People who bought from us or delivered to our orders, waiting their turn to be followed. */
@@ -353,27 +355,35 @@ public final class Follows {
     /** Select intent independently of transport; menus and trade safety still gate sending. */
     synchronized String nextRequestedName() {
         String next = retries.pollFirst();
+        while (next != null && !commandNameAllowed(next)) next = retries.pollFirst();
         while (next == null && !requestedBots.isEmpty()) {
             String name = requestedBots.iterator().next();
             requestedBots.remove(name);
             if (!state.containsKey(name.toLowerCase(Locale.ROOT))
-                    && !name.equalsIgnoreCase(pending)) next = name;
+                    && !name.equalsIgnoreCase(pending) && commandNameAllowed(name)) next = name;
         }
         // People trading with us right now come before a list drawn from old records.
         while (next == null && !traders.isEmpty()) {
             String trader = traders.iterator().next();
             traders.remove(trader);
-            if (!state.containsKey(trader.toLowerCase(Locale.ROOT))) next = trader;
+            if (!state.containsKey(trader.toLowerCase(Locale.ROOT)) && commandNameAllowed(trader)) next = trader;
         }
         if (next == null) {
             for (String name : wanted) {
-                if (!state.containsKey(name.toLowerCase(Locale.ROOT))) {
+                if (!state.containsKey(name.toLowerCase(Locale.ROOT)) && commandNameAllowed(name)) {
                     next = name;
                     break;
                 }
             }
         }
         return next;
+    }
+
+    private boolean commandNameAllowed(String name) {
+        if (OutgoingCommandText.valid("follow " + name)) return true;
+        // Refuse this name without rewriting it or terminating unrelated allowed intent.
+        commandRefused.add(name.toLowerCase(Locale.ROOT));
+        return false;
     }
 
     /** Every notice since {@code since}, oldest first. Safe from any thread. */
@@ -552,6 +562,7 @@ public final class Follows {
         for (String name : knownBots()) {
             String key = name.toLowerCase(Locale.ROOT);
             String outcome = state.get(key);
+            if ("FOLLOWED".equals(outcome) || !commandNameAllowed(name)) continue;
             if ("NO_REPLY".equals(outcome) || "NOT_FOUND".equals(outcome)) state.remove(key);
             if (!state.containsKey(key) && !name.equalsIgnoreCase(pending)) requestedBots.add(name);
         }
@@ -568,12 +579,14 @@ public final class Follows {
     public synchronized String status() {
         long followed = state.values().stream().filter("FOLLOWED"::equals).count();
         long queued = wanted.stream().map(n -> n.toLowerCase(Locale.ROOT)).distinct()
-                .filter(n -> !state.containsKey(n) && !n.equalsIgnoreCase(pending)).count();
+                .filter(n -> !state.containsKey(n) && !n.equalsIgnoreCase(pending))
+                .filter(n -> OutgoingCommandText.valid("follow " + n)).count();
         long unavailable = state.values().stream().filter("NOT_FOUND"::equals).count();
         long unanswered = state.values().stream().filter("NO_REPLY"::equals).count();
         return followed + " confirmed here; " + queued + " list names waiting"
                 + (unavailable == 0 ? "" : "; " + unavailable + " unavailable")
                 + (unanswered == 0 ? "" : "; " + unanswered + " unanswered")
+                + (commandRefused.isEmpty() ? "" : "; " + commandRefused.size() + " names refused by command policy")
                 + (pending == null ? "" : "; /follow " + pending
                 + (driver.externalQueued("follow " + pending) ? " waiting for a safe command gap" : " awaiting reply"))
                 + (followed >= Tuning.get("follow.max") ? "; at configured follow cap" : "")

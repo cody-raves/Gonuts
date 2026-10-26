@@ -1,5 +1,11 @@
 # GoNuts changelog
 
+## 2026-10-26 16:12 UTC
+
+- **PR #377: Keep dashboard sign-in usable when the browser does not open.** The Swarm panel always displays the public dashboard address and offers **Copy website address**, without requiring pairing. Silent desktop-launcher failures leave a manual route; browser or clipboard exceptions show concise guidance instead of escaping the GUI callback. The panel never treats a returned launch request as proof that a browser opened.
+- Actual offline Minecraft GUI regression: old panel fails with missing Copy website address; repaired panel passes silent/throwing injected launchers, copy without pairing, compact resize, scrolling and rebuild. Four failure-path unit regressions pass. Clean production build: **1,743 tests, zero failures/errors, two skipped**; normal client entrypoint only, no smoke classes. Native desktop and compact screenshots inspected. Report223 stays open: its original Linux environment/launcher cause and affected-client recovery remain unverified. Pairing/authentication, settings, records and safety gates are unchanged; no live client install/restart.
+- Client artifact published **2026-10-26T16:12:36Z**. Build `1793030883148`; client SHA256 `f2856528dcc69c175298246db668b44802ee0e1431130be8a8b6566d50c68f82`. Source SHA256 `f7545a53d44466ebb699b747e7fee2db43b9a284c05e2776ed44aa144e7dc73d`, published 2026-10-26T16:12:39Z. Public client/source/checksums independently downloaded and verified. PR377 merge `e7ba4d60bd513c2e4208060911b79ca8c394b656`; tested source `7d54c57320d5c194656da21ef7b9bde3175c946c`. Documentation only; earlier separate dated client publications remain below.
+
 ## 2026-10-26 13:26 UTC
 
 - **PR #375: Preserve native auction-row ownership during quantity reconciliation.** Report370 exposed a resize fallback that could take another parked position's exact native row after the repricing pass correctly reserved it. Equal quantities could enter that fallback too, cancelling/reopening the missing record at another price before ordinary sale-budget reconciliation and leaving the real owner without its row.
